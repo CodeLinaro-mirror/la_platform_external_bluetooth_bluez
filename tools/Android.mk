@@ -29,6 +29,7 @@ include $(BUILD_EXECUTABLE)
 # sdptool
 #
 
+ifneq ($(strip $(BOARD_USE_BM3_FULLSTACK)),true)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
@@ -50,6 +51,7 @@ LOCAL_STATIC_LIBRARIES := \
 LOCAL_MODULE:=sdptool
 
 include $(BUILD_EXECUTABLE)
+endif
 
 #
 # hciconfig
