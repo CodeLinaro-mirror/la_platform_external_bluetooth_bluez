@@ -48,27 +48,29 @@
 #include "rtp.h"
 #include "liba2dp.h"
 
-#define LOG_NDEBUG 0
-#define LOG_TAG "A2DP"
-#include <utils/Log.h>
-
-#define ENABLE_DEBUG
-/* #define ENABLE_VERBOSE */
-/* #define ENABLE_TIMING */
-
 #define BUFFER_SIZE 2048
 
+#ifdef ENABLE_TIMING
+#define ENABLE_DEBUG
+#define ENABLE_VERBOSE
+#endif
+
 #ifdef ENABLE_DEBUG
+#define LOG_NDDEBUG 0
 #define DBG LOGD
 #else
 #define DBG(fmt, arg...)
 #endif
 
 #ifdef ENABLE_VERBOSE
+#define LOG_NDEBUG 0
 #define VDBG LOGV
 #else
 #define VDBG(fmt, arg...)
 #endif
+
+#define LOG_TAG "A2DP"
+#include <utils/Log.h>
 
 #ifndef MIN
 # define MIN(x, y) ((x) < (y) ? (x) : (y))
@@ -686,30 +688,30 @@ static int avdtp_write(struct bluetooth_data *data)
 	end2 = get_microseconds();
 	print_time("poll", begin2, end2);
 #endif
-	if (ret == 1 && data->stream.revents == POLLOUT) {
-		long ahead = 0;
-		now = get_microseconds();
+	long ahead = 0;
+	now = get_microseconds();
 
-		if (data->next_write) {
-			ahead = data->next_write - now;
+	if (data->next_write) {
+		ahead = data->next_write - now;
 #ifdef ENABLE_TIMING
-			DBG("duration: %ld, ahead: %ld", duration, ahead);
+		DBG("duration: %ld, ahead: %ld", duration, ahead);
 #endif
-			if (ahead > 0) {
-				/* too fast, need to throttle */
-				usleep(ahead);
-			}
-		} else {
-			data->next_write = now;
+		if (ahead > 0) {
+			/* too fast, need to throttle */
+			usleep(ahead);
 		}
-		if (ahead <= -CATCH_UP_TIMEOUT * 1000) {
-			/* fallen too far behind, don't try to catch up */
-			VDBG("ahead < %d, reseting next_write timestamp", -CATCH_UP_TIMEOUT * 1000);
-			data->next_write = 0;
-		} else {
-			data->next_write += duration;
-		}
+	} else {
+		data->next_write = now;
+	}
+	if (ahead <= -CATCH_UP_TIMEOUT * 1000) {
+		/* fallen too far behind, don't try to catch up */
+		VDBG("ahead < %d, reseting next_write timestamp", -CATCH_UP_TIMEOUT * 1000);
+		data->next_write = 0;
+	} else {
+		data->next_write += duration;
+	}
 
+	if (ret == 1 && data->stream.revents == POLLOUT) {
 #ifdef ENABLE_TIMING
 		begin2 = get_microseconds();
 #endif
@@ -729,7 +731,6 @@ static int avdtp_write(struct bluetooth_data *data)
 		/* can happen during normal remote disconnect */
 		VDBG("poll() failed: %d (revents = %d, errno %s)",
 				ret, data->stream.revents, strerror(errno));
-		data->next_write = 0;
 	}
 
 	/* Reset buffer of data to send */
@@ -753,7 +754,7 @@ static int audioservice_send(struct bluetooth_data *data,
 
 	length = msg->length ? msg->length : BT_SUGGESTED_BUFFER_SIZE;
 
-	VDBG("sending %s", bt_audio_strmsg(msg->msg_type));
+	VDBG("sending %s", bt_audio_strtype(msg->type));
 	if (send(data->server.fd, msg, length,
 			MSG_NOSIGNAL) > 0)
 		err = 0;
