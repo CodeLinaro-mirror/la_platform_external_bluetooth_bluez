@@ -47,7 +47,7 @@ AC_ARG_BLUEZ
 
 AC_OUTPUT([
 	Makefile
-	include/Makefile
+	include/bluetooth/Makefile
 	lib/Makefile
 	gdbus/Makefile
 	common/Makefile

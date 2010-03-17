@@ -108,4 +108,6 @@ int remove_record_from_server(uint32_t handle);
 
 uint8_t get_service_classes(const bdaddr_t *bdaddr);
 void create_ext_inquiry_response(const char *name, uint8_t *data);
+#ifdef ANDROID
 static inline int android_get_control_socket(const char *name);
+#endif
