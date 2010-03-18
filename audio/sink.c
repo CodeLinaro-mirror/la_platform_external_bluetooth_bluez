@@ -635,12 +635,6 @@ static DBusMessage *sink_connect(DBusConnection *conn,
 	pending->conn = dbus_connection_ref(conn);
 	pending->msg = dbus_message_ref(msg);
 
-#ifdef SCMS_T_DEFAULT_ENFORCE
-	sink->protection_required = TRUE;
-#else
-	sink->protection_required = FALSE;
-#endif
-
 	debug("stream creation in progress");
 
 	return NULL;
@@ -834,7 +828,7 @@ static DBusMessage *sink_require_protection(DBusConnection *conn,
 
 	sink->protection_required = protection_required;
 
-	return NULL;
+	return dbus_message_new_method_return(msg);
 }
 
 static GDBusMethodTable sink_methods[] = {
@@ -925,6 +919,12 @@ struct sink *sink_init(struct audio_device *dev)
 	sink = g_new0(struct sink, 1);
 
 	sink->dev = dev;
+
+#ifdef SCMS_T_DEFAULT_ENFORCE
+	sink->protection_required = TRUE;
+#else
+	sink->protection_required = FALSE;
+#endif
 
 	return sink;
 }
