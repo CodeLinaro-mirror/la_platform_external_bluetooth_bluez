@@ -42,6 +42,7 @@ LOCAL_C_INCLUDES:=\
 	$(LOCAL_PATH)/../common \
 
 LOCAL_SHARED_LIBRARIES := \
+	libcutils \
 	libbluetooth
 
 LOCAL_STATIC_LIBRARIES := \

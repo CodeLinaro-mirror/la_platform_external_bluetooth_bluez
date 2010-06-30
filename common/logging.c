@@ -3,6 +3,7 @@
  *  BlueZ - Bluetooth protocol stack for Linux
  *
  *  Copyright (C) 2004-2009  Marcel Holtmann <marcel@holtmann.org>
+ *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -27,15 +28,26 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+
+#ifdef ANDROID
+#define LOG_TAG "bluetoothd"
+#include <cutils/log.h>
+#else
 #include <syslog.h>
+#endif /* ANDROID */
 
 #include "logging.h"
+
 
 static volatile int debug_enabled = 0;
 
 static inline void vinfo(const char *format, va_list ap)
 {
+#ifdef ANDROID
+	LOG_PRI_VA(ANDROID_LOG_INFO, LOG_TAG, format, ap);
+#else
 	vsyslog(LOG_INFO, format, ap);
+#endif
 }
 
 void info(const char *format, ...)
@@ -55,7 +67,11 @@ void error(const char *format, ...)
 
 	va_start(ap, format);
 
+#ifdef ANDROID
+	LOG_PRI_VA(ANDROID_LOG_ERROR, LOG_TAG, format, ap);
+#else
 	vsyslog(LOG_ERR, format, ap);
+#endif
 
 	va_end(ap);
 }
@@ -69,7 +85,11 @@ void debug(const char *format, ...)
 
 	va_start(ap, format);
 
+#ifdef ANDROID
+	LOG_PRI_VA(ANDROID_LOG_DEBUG, LOG_TAG, format, ap);
+#else
 	vsyslog(LOG_DEBUG, format, ap);
+#endif
 
 	va_end(ap);
 }
@@ -93,7 +113,9 @@ void start_logging(const char *ident, const char *message, ...)
 {
 	va_list ap;
 
+#ifndef ANDROID
 	openlog(ident, LOG_PID | LOG_NDELAY | LOG_PERROR, LOG_DAEMON);
+#endif
 
 	va_start(ap, message);
 
@@ -104,5 +126,7 @@ void start_logging(const char *ident, const char *message, ...)
 
 void stop_logging(void)
 {
+#ifndef ANDROID
 	closelog();
+#endif
 }
