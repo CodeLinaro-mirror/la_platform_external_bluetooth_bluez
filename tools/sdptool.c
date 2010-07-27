@@ -782,13 +782,22 @@ static int set_attrib(sdp_session_t *sess, uint32_t handle, uint16_t attrib, cha
 
 		sdp_attr_add_new(rec, attrib, SDP_UUID16, &value_uuid.value.uuid16);
 	} else if (!strncasecmp(value, "0x", 2)) {
-		/* Int */
+		/* Int 32 bit */
 		uint32_t value_int;  
 		value_int = strtoul(value + 2, NULL, 16);
 		printf("Adding attrib 0x%X int 0x%X to record 0x%X\n",
 			attrib, value_int, handle);
 
 		sdp_attr_add_new(rec, attrib, SDP_UINT32, &value_int);
+	} else if (!strncasecmp(value, "url:", 4)) {
+		/* Strip off the "url:" indicator */
+		char *value_url;
+		value_url = value + 4;
+		/* URL type String */
+		printf("Adding attrib 0x%X url string \"%s\" to record 0x%X\n",
+			attrib, value_url, handle);
+		/* Add/Update our attributes to the record */
+		sdp_attr_add_new(rec, attrib, SDP_URL_STR8, value_url);
 	} else {
 		/* String */
 		printf("Adding attrib 0x%X string \"%s\" to record 0x%X\n",
