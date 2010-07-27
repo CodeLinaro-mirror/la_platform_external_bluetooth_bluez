@@ -789,6 +789,14 @@ static int set_attrib(sdp_session_t *sess, uint32_t handle, uint16_t attrib, cha
 			attrib, value_int, handle);
 
 		sdp_attr_add_new(rec, attrib, SDP_UINT32, &value_int);
+	} else if (!strncasecmp(value, "8:0x", 4)) {
+		/* Int 8 bit */
+		uint8_t value_int;
+		value_int = strtoul(value + 4, NULL, 16);
+		printf("Adding attrib 0x%X int8 0x%X to record 0x%X\n",
+			attrib, value_int, handle);
+
+		sdp_attr_add_new(rec, attrib, SDP_UINT8, &value_int);
 	} else if (!strncasecmp(value, "url:", 4)) {
 		/* Strip off the "url:" indicator */
 		char *value_url;
@@ -880,6 +888,7 @@ static int set_attribseq(sdp_session_t *session, uint32_t handle, uint16_t attri
 	void **allocArray;
 	uint8_t uuid16 = SDP_UUID16;
 	uint8_t uint32 = SDP_UINT32;
+	uint8_t uint8 = SDP_UINT8;
 	uint8_t str8 = SDP_TEXT_STR8;
 	int i, ret = 0;
 
@@ -919,6 +928,17 @@ static int set_attribseq(sdp_session_t *session, uint32_t handle, uint16_t attri
 
 			printf("Adding int 0x%X to record 0x%X\n", *value_int, handle);
 			dtdArray[i] = &uint32;
+			valueArray[i] = value_int;
+		} else if (!strncasecmp(argv[i], "8:0x", 4)) {
+			/* Int 8 bit*/
+			uint32_t *value_int = (uint32_t *) malloc(sizeof(int));
+			allocArray[i] = value_int;
+			*value_int = strtoul((argv[i]) + 4, NULL, 16);
+
+			printf("Adding int8 0x%X to record 0x%X\n", *value_int,
+				handle);
+
+			dtdArray[i] = &uint8;
 			valueArray[i] = value_int;
 		} else {
 			/* String */
