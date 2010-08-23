@@ -48,6 +48,8 @@
 #include "logging.h"
 #include "manager.h"
 
+#define SIZEOF_UUID128 16
+
 static sdp_record_t *server = NULL;
 
 static uint8_t service_classes = 0x00;
@@ -166,6 +168,63 @@ uint8_t get_service_classes(const bdaddr_t *bdaddr)
 	return service_classes;
 }
 
+static void eir_generate_uuid128(sdp_list_t *list,
+					uint8_t *ptr, uint16_t *eir_len)
+{
+	int i, k, index = 0;
+	uint16_t len = *eir_len;
+	uint8_t *uuid128;
+	gboolean truncated = FALSE;
+
+	/* Store UUIDs in place, skip 2 bytes to write type and length later */
+	uuid128 = ptr + 2;
+
+	for (; list; list = list->next) {
+		sdp_record_t *rec = (sdp_record_t *) list->data;
+		uint8_t *uuid128_data = rec->svclass.value.uuid128.data;
+
+		if (rec->svclass.type != SDP_UUID128)
+			continue;
+
+		/* Stop if not enough space to put next UUID128 */
+		if ((len + 2 + SIZEOF_UUID128) > EIR_DATA_LENGTH) {
+			truncated = TRUE;
+			break;
+		}
+
+		/* Check for duplicates, EIR data is Little Endian */
+		for (i = 0; i < index; i++) {
+			for (k = 0; k < SIZEOF_UUID128; k++) {
+				if (uuid128[i * SIZEOF_UUID128 + k] !=
+					uuid128_data[SIZEOF_UUID128 - k])
+					break;
+			}
+			if (k == SIZEOF_UUID128)
+				break;
+		}
+
+		if (i < index)
+			continue;
+
+		/* EIR data is Little Endian */
+		for (k = 0; k < SIZEOF_UUID128; k++)
+			uuid128[index * SIZEOF_UUID128 + k] =
+				uuid128_data[SIZEOF_UUID128 - 1 - k];
+
+		len += SIZEOF_UUID128;
+		index++;
+	}
+
+	if (index > 0 || truncated) {
+		/* EIR Data length */
+		ptr[0] = (index * SIZEOF_UUID128) + 1;
+		/* EIR Data type */
+		ptr[1] = truncated ? EIR_UUID128_SOME : EIR_UUID128_ALL;
+		len += 2;
+		*eir_len = len;
+	}
+}
+
 void create_ext_inquiry_response(const char *name, uint8_t *data)
 {
 	sdp_list_t *list = sdp_get_record_list();
@@ -250,6 +309,12 @@ void create_ext_inquiry_response(const char *name, uint8_t *data)
 			*ptr++ = (uuid16[i] & 0x00ff);
 			*ptr++ = (uuid16[i] & 0xff00) >> 8;
 		}
+	}
+
+	/* Group all UUID128 types */
+	if (eir_len <= EIR_DATA_LENGTH - 2) {
+		list = sdp_get_record_list();
+		eir_generate_uuid128(list, ptr, &eir_len);
 	}
 }
 
