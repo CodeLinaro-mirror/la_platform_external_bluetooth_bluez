@@ -223,7 +223,7 @@ void create_ext_inquiry_response(const char *name, uint8_t *data)
 			if (uuid[i] == rec->svclass.value.uuid16)
 				break;
 
-		if (i == index - 1)
+		if (i < index)
 			continue;
 
 		uuid[index++] = rec->svclass.value.uuid16;
