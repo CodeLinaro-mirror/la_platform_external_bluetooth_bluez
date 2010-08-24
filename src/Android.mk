@@ -52,6 +52,7 @@ LOCAL_STATIC_LIBRARIES := \
 	libglib_static \
 	libbluez-common-static \
 	libbuiltinplugin \
+	libglib_static \
 	libgdbus_static
 
 LOCAL_MODULE:=libbluetoothd
