@@ -86,6 +86,7 @@ struct a2dp_setup {
 	struct audio_device *dev;
 	struct avdtp *session;
 	struct a2dp_sep *sep;
+        struct avdtp_remote_sep *rsep;
 	struct avdtp_stream *stream;
 	struct avdtp_error *err;
 	GSList *client_caps;
@@ -800,6 +801,12 @@ static gboolean a2dp_reconfigure(gpointer data)
 					codec_cap->media_type,
 					codec_cap->media_codec_type,
 					&lsep, &rsep);
+
+        if (setup->rsep) {
+          rsep = setup->rsep;
+	  setup->rsep = NULL;
+        }
+
 	if (posix_err < 0) {
 		error("No matching ACP and INT SEPs found");
 		goto failed;
@@ -848,8 +855,10 @@ static void close_cfm(struct avdtp *session, struct avdtp_local_sep *sep,
 		return;
 	}
 
-	if (setup->reconfigure)
+	if (setup->reconfigure) {
+		setup->rsep = avdtp_stream_get_remote_sep(stream);
 		g_timeout_add(RECONFIGURE_TIMEOUT, a2dp_reconfigure, setup);
+	}
 }
 
 static gboolean abort_ind(struct avdtp *session, struct avdtp_local_sep *sep,
