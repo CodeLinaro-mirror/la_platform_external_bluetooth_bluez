@@ -1,0 +1,28 @@
+Source: bluez
+Priority: optional
+Maintainer: "Linux Build" <linux.build@codeaurora.org>
+Build-Depends: debhelper (>= 7), libtool, autoconf
+Standards-Version: 3.8.1
+Section: admin
+
+Package: bluez
+Architecture: any
+Depends: libbluetooth3 (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Description: Bluetooth tools and daemons
+
+Package: bluez-alsa
+Architecture: any
+Depends: libbluetooth3 (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Description: Bluetooth audio support
+
+Package: libbluetooth-dev
+Section: libdevel
+Architecture: any
+Depends: libbluetooth3 (= ${binary:Version}), ${misc:Depends}
+Description: Development files for using the BlueZ Linux Bluetooth library
+
+Package: libbluetooth3
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Library to use the BlueZ Linux Bluetooth stack

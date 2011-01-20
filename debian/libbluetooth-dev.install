@@ -1,0 +1,4 @@
+usr/include/bluetooth/*
+usr/lib/libbluetooth.la
+usr/lib/libbluetooth.so
+usr/lib/pkgconfig/bluez.pc

@@ -1,0 +1,7 @@
+etc/bluetooth
+etc/dbus-1/system.d
+lib/udev/rules.d
+usr/bin
+usr/sbin
+usr/share/man/man1
+usr/share/man/man8

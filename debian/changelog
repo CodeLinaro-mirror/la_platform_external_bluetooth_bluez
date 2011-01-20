@@ -1,0 +1,5 @@
+bluez (4.79-0msm1) unstable; urgency=low
+
+  * Initial Debian packaging
+
+ -- "Linux Build" <linux.build@codeaurora.org>  Tue, 18 Jan 2011 08:51:59 -0600
