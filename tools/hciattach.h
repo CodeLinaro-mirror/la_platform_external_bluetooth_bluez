@@ -3,6 +3,7 @@
  *  BlueZ - Bluetooth protocol stack for Linux
  *
  *  Copyright (C) 2003-2010  Marcel Holtmann <marcel@holtmann.org>
+ *  Copyright (C) 2011, Code Aurora Forum. All rights reserved.
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -38,7 +39,12 @@
 #define HCI_UART_3WIRE	2
 #define HCI_UART_H4DS	3
 #define HCI_UART_LL	4
-#define HCI_UART_ATH3K  5
+/*
+* Commenting out HCI_UART_ATH3K as this protocol
+* is not part of BlueZ 4.69 kernel component
+*/
+//#define HCI_UART_ATH3K  5
+#define HCI_UART_IBS  5
 
 #define HCI_UART_RAW_DEVICE	0
 

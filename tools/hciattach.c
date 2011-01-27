@@ -5,6 +5,7 @@
  *  Copyright (C) 2000-2001  Qualcomm Incorporated
  *  Copyright (C) 2002-2003  Maxim Krasnyansky <maxk@qualcomm.com>
  *  Copyright (C) 2002-2010  Marcel Holtmann <marcel@holtmann.org>
+ *  Copyright (C) 2011, Code Aurora Forum. All rights reserved.
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -1118,13 +1119,21 @@ struct uart_t uart[] = {
 	/* Broadcom BCM2035 */
 	{ "bcm2035",    0x0A5C, 0x2035, HCI_UART_H4,   115200, 460800,
 				FLOW_CTL, DISABLE_PM, NULL, bcm2035  },
-
+	/*
+	* Commenting out HCI_UART_ATH3K as this protocol
+	* is not part of BlueZ 4.69 kernel component
+	*/
+/*
 	{ "ath3k",    0x0000, 0x0000, HCI_UART_ATH3K, 115200, 115200,
 			FLOW_CTL, DISABLE_PM, NULL, ath3k_ps, ath3k_pm  },
+*/
 
 	/* QUALCOMM BTS */
 	{ "qualcomm",   0x0000, 0x0000, HCI_UART_H4,   115200, 115200,
 			FLOW_CTL, DISABLE_PM, NULL, qualcomm, NULL },
+        /* QUALCOMM BTS */
+        { "qualcomm-ibs",   0x0000, 0x0000, HCI_UART_IBS,   115200, 115200,
+                        FLOW_CTL, DISABLE_PM, NULL, NULL, NULL },
 
 	{ NULL, 0 }
 };
