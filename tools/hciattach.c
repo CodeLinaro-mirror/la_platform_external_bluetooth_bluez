@@ -1003,6 +1003,38 @@ static int bcm2035(int fd, struct uart_t *u, struct termios *ti)
 	return 0;
 }
 
+static int qcom_uart_init(int fd, struct uart_t *u, struct termios *ti)
+{
+	int flags = 0;
+
+	if (ioctl(fd, TIOCMGET, &flags) < 0) {
+		perror("TIOCMGET failed in init\n");
+		return -1;
+	}
+	flags &= ~TIOCM_RTS;
+	if (ioctl(fd, TIOCMSET, &flags) < 0) {
+		perror("TIOCMSET failed in init: HW Flow-off error\n");
+		return -1;
+	}
+	return 0;
+}
+
+static int qcom_uart_post(int fd, struct uart_t *u, struct termios *ti)
+{
+	int flags = 0;
+
+	if (ioctl(fd, TIOCMGET, &flags) < 0) {
+		perror("TIOCMGET failed in post\n");
+		return -1;
+	}
+	flags &= ~TIOCM_RTS;
+	if (ioctl(fd, TIOCMSET, &flags) < 0) {
+		perror("TIOCMSET failed in post: HW Flow-on error\n");
+		return -1;
+	}
+	return 0;
+}
+
 struct uart_t uart[] = {
 	{ "any",        0x0000, 0x0000, HCI_UART_H4,   115200, 115200, FLOW_CTL, NULL, NULL     },
 	{ "ericsson",   0x0000, 0x0000, HCI_UART_H4,   57600,  115200, FLOW_CTL, NULL, ericsson },
@@ -1072,8 +1104,10 @@ struct uart_t uart[] = {
 	{ "bcm2035",    0x0A5C, 0x2035, HCI_UART_H4,   115200, 460800, FLOW_CTL, NULL, bcm2035  },
 
 	/* QUALCOMM BTS */
-	{ "qualcomm",   0x0000, 0x0000, HCI_UART_H4,   115200, 115200, FLOW_CTL, NULL, NULL     },
-	{ "qualcomm-ibs", 0x0000, 0x0000, HCI_UART_IBS,  115200, 115200, FLOW_CTL, NULL, NULL     },
+	{ "qualcomm",   0x0000, 0x0000, HCI_UART_H4,   115200, 115200,
+			FLOW_CTL, NULL, NULL, NULL     },
+	{ "qualcomm-ibs", 0x0000, 0x0000, HCI_UART_IBS,  115200, 115200,
+			FLOW_CTL, NULL, qcom_uart_init, qcom_uart_post     },
 
 	{ NULL, 0 }
 };
