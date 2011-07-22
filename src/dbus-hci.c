@@ -718,7 +718,7 @@ void hcid_dbus_inquiry_result(bdaddr_t *local, bdaddr_t *peer, uint32_t class,
 		}
 	}
 
-	if (name && name_type != 0x08)
+	if (name && (name_type == 0x09))
 		name_status = NAME_SENT;
 
 	/* add in the list to track name sent/pending */
