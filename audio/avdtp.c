@@ -2751,8 +2751,14 @@ static gboolean avdtp_discover_resp(struct avdtp *session,
 
 		sep = find_remote_sep(session->seps, resp->seps[i].seid);
 		if (!sep) {
-			if (resp->seps[i].inuse && !stream)
-				continue;
+			if (resp->seps[i].inuse && !stream) {
+				if ((i + 1) == sep_count) {
+					finalize_discovery(session, -EINPROGRESS);
+					return TRUE;
+				}
+				else
+					continue;
+			}
 			sep = g_new0(struct avdtp_remote_sep, 1);
 			session->seps = g_slist_append(session->seps, sep);
 		}
