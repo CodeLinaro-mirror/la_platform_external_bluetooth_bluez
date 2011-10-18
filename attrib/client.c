@@ -711,7 +711,8 @@ static void gatt_write_cli_conf_resp(guint8 status, const guint8 *pdu,
 }
 
 static DBusMessage *set_value(DBusConnection *conn, DBusMessage *msg,
-			DBusMessageIter *iter, struct characteristic *chr)
+			DBusMessageIter *iter, struct characteristic *chr,
+			gboolean isRequest)
 {
 	struct gatt_service *gatt = chr->prim->gatt;
 	struct query_data *qvalue;
@@ -734,16 +735,25 @@ static DBusMessage *set_value(DBusConnection *conn, DBusMessage *msg,
 		return reply;
 	}
 
-	qvalue = g_new0(struct query_data, 1);
-	qvalue->prim = chr->prim;
-	qvalue->chr = chr;
+	if (isRequest) {
+		qvalue = g_malloc0(sizeof(struct query_data) + len);
+		qvalue->prim = chr->prim;
+		qvalue->chr = chr;
 
-	chr->msg = dbus_message_ref(msg);
+		chr->msg = dbus_message_ref(msg);
 
-	gatt_write_char(gatt->attrib, chr->handle, value,
-					len, gatt_write_char_resp, qvalue);
+		gatt_write_char(gatt->attrib, chr->handle, value,
+				len, gatt_write_char_resp, qvalue);
+	} else {
+		gatt_write_char(gatt->attrib, chr->handle, value,
+						len, NULL,  qvalue);
+	}
 
-  return NULL;
+	if (isRequest)
+		return NULL;
+	else
+		return dbus_message_new_method_return(msg);
+
 }
 
 static DBusMessage *set_cli_conf(DBusConnection *conn, DBusMessage *msg,
@@ -823,9 +833,40 @@ static DBusMessage *set_property(DBusConnection *conn,
 	dbus_message_iter_recurse(&iter, &sub);
 
 	if (g_str_equal("Value", property)) {
-		return set_value(conn, msg, &sub, chr);
+		return set_value(conn, msg, &sub, chr, TRUE);
 	} else if (g_str_equal("ClientConfiguration", property)) {
 		return set_cli_conf(conn, msg, &sub, chr);
+	}
+	return btd_error_invalid_args(msg);
+}
+
+static DBusMessage *set_property_command(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct characteristic *chr = data;
+	DBusMessageIter iter;
+	DBusMessageIter sub;
+	const char *property;
+
+	DBG("");
+
+	if (!dbus_message_iter_init(msg, &iter))
+		return btd_error_invalid_args(msg);
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
+		return btd_error_invalid_args(msg);
+
+	dbus_message_iter_get_basic(&iter, &property);
+	dbus_message_iter_next(&iter);
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT)
+		return btd_error_invalid_args(msg);
+
+	dbus_message_iter_recurse(&iter, &sub);
+
+/* Currently supported only for writing Value property */
+	if (g_str_equal("Value", property)) {
+		return set_value(conn, msg, &sub, chr, FALSE);
 	}
 
 	return btd_error_invalid_args(msg);
@@ -863,6 +904,7 @@ static GDBusMethodTable char_methods[] = {
 	{ "GetProperties",	"",	"a{sv}", get_properties },
 	{ "SetProperty",	"sv",	"",	set_property,
 						G_DBUS_METHOD_FLAG_ASYNC},
+	{ "SetPropertyCommand",	"sv",	"",	set_property_command} ,
 	{ "UpdateValue",	"",	"",	fetch_value,
 						G_DBUS_METHOD_FLAG_ASYNC},
 	{ }
