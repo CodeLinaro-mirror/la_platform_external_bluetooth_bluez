@@ -169,6 +169,17 @@ static void gatt_service_free(void *user_data)
 	g_free(gatt);
 }
 
+static void characteristics_clean_dbus_msg(gpointer user_data) {
+	struct characteristic *chr = user_data;
+	chr->msg = NULL;
+}
+
+static void primary_clean_dbus_msg(gpointer user_data) {
+	struct primary *prim = user_data;
+	g_slist_foreach(prim->chars, (GFunc) characteristics_clean_dbus_msg, NULL);
+	prim->discovery_msg = NULL;
+}
+
 static int gatt_dev_cmp(gconstpointer a, gconstpointer b)
 {
 	const struct gatt_service *gatt = a;
@@ -629,34 +640,38 @@ static void gatt_write_char_resp(guint8 status, const guint8 *pdu,
 
 	DBG("Gatt Write Char Response Recv, status = %d", status);
 
-	if (status == 0) {
-		msg = chr->msg;
-		dbus_message_iter_init(msg, &iter);
-		dbus_message_iter_next(&iter);
-		dbus_message_iter_recurse(&iter, &sub);
-		dbus_message_iter_recurse(&sub, &sub_value);
-		dbus_message_iter_get_fixed_array(&sub_value, &value, &vlen);
+	if (chr->msg) {
+		if (status == 0) {
+			msg = chr->msg;
+			dbus_message_iter_init(msg, &iter);
+			dbus_message_iter_next(&iter);
+			dbus_message_iter_recurse(&iter, &sub);
+			dbus_message_iter_recurse(&sub, &sub_value);
+			dbus_message_iter_get_fixed_array(&sub_value, &value, &vlen);
 
-		characteristic_set_value(chr, value, vlen);
+			characteristic_set_value(chr, value, vlen);
 
-		reply = dbus_message_new_method_return(chr->msg);
-		if (!reply) {
-			chr->msg == NULL;
-			return;
-		}
+			reply = dbus_message_new_method_return(chr->msg);
+			if (!reply) {
+				chr->msg = NULL;
+				return;
+			}
 
-		g_dbus_send_message(gatt->conn, reply);
-
-		chr->msg = NULL;
-	} else {
-		reply = btd_error_invalid_args(chr->msg);
-		if (!reply) {
-			DBG("reply is NULL");
-			chr->msg == NULL;
-		} else {
 			g_dbus_send_message(gatt->conn, reply);
+
 			chr->msg = NULL;
+		} else {
+			reply = btd_error_invalid_args(chr->msg);
+			if (!reply) {
+				DBG("reply is NULL");
+				chr->msg = NULL;
+			} else {
+				g_dbus_send_message(gatt->conn, reply);
+				chr->msg = NULL;
+			}
 		}
+	} else {
+		DBG("Characteristics Dbus message is NULL");
 	}
 
 	g_attrib_unref(gatt->attrib);
@@ -679,32 +694,36 @@ static void gatt_write_cli_conf_resp(guint8 status, const guint8 *pdu,
 
 	DBG("Gatt Write Cli Conf Response Recv, status = %d", status);
 
-	if (status == 0) {
-		msg = chr->msg;
-		dbus_message_iter_init(msg, &iter);
-		dbus_message_iter_next(&iter);
-		dbus_message_iter_recurse(&iter, &sub);
-		dbus_message_iter_recurse(&sub, &sub_value);
-		dbus_message_iter_get_fixed_array(&sub_value, &value, &vlen);
+	if (chr->msg) {
+		if (status == 0) {
+			msg = chr->msg;
+			dbus_message_iter_init(msg, &iter);
+			dbus_message_iter_next(&iter);
+			dbus_message_iter_recurse(&iter, &sub);
+			dbus_message_iter_recurse(&sub, &sub_value);
+			dbus_message_iter_get_fixed_array(&sub_value, &value, &vlen);
 
-		characteristic_set_cli_conf(chr, value);
+			characteristic_set_cli_conf(chr, value);
 
-		reply = dbus_message_new_method_return(chr->msg);
-		if (!reply) {
-			chr->msg == NULL;
-			return;
-		}
+			reply = dbus_message_new_method_return(chr->msg);
+			if (!reply) {
+				chr->msg = NULL;
+				return;
+			}
 
-		g_dbus_send_message(gatt->conn, reply);
-		chr->msg = NULL;
-	} else {
-		reply = btd_error_invalid_args(chr->msg);
-		if (!reply) {
-			chr->msg == NULL;
-		} else {
 			g_dbus_send_message(gatt->conn, reply);
 			chr->msg = NULL;
+		} else {
+			reply = btd_error_invalid_args(chr->msg);
+			if (!reply) {
+				chr->msg = NULL;
+			} else {
+				g_dbus_send_message(gatt->conn, reply);
+				chr->msg = NULL;
+			}
 		}
+	} else {
+		DBG("Characteristics Dbus message is NULL");
 	}
 
 	g_attrib_unref(gatt->attrib);
@@ -720,6 +739,13 @@ static DBusMessage *set_value(DBusConnection *conn, DBusMessage *msg,
 	GError *gerr = NULL;
 	uint8_t *value;
 	int len;
+
+	if (chr->msg) {
+		DBG("chr->msg is not NULL : Other Gatt operation is in progress chr->msg");
+		DBusMessage *reply = btd_error_failed(msg, "Gatt operation already in progress");
+		g_error_free(gerr);
+		return reply;
+	}
 
 	if (dbus_message_iter_get_arg_type(iter) != DBUS_TYPE_ARRAY ||
 			dbus_message_iter_get_element_type(iter) != DBUS_TYPE_BYTE)
@@ -765,6 +791,13 @@ static DBusMessage *set_cli_conf(DBusConnection *conn, DBusMessage *msg,
 	GError *gerr = NULL;
 	uint8_t *value;
 	int len;
+
+	if (chr->msg) {
+		DBG("chr->msg is not NULL : Other Gatt operation is in progress chr->msg");
+		DBusMessage *reply = btd_error_failed(msg, "Gatt operation already in progress");
+		g_error_free(gerr);
+		return reply;
+	}
 
 	if (dbus_message_iter_get_arg_type(iter) != DBUS_TYPE_ARRAY ||
 			dbus_message_iter_get_element_type(iter) != DBUS_TYPE_BYTE)
@@ -882,6 +915,13 @@ static DBusMessage *fetch_value(DBusConnection *conn,
 	struct gatt_service *gatt = prim->gatt;
 
 	DBG("");
+
+	if (chr->msg) {
+		DBG("chr->msg is not NULL : Other Gatt operation is in progress");
+		DBusMessage *reply = btd_error_failed(msg, "Gatt operation already in progress");
+		g_error_free(gerr);
+		return reply;
+	}
 
 	if (l2cap_connect(gatt, &gerr, FALSE) < 0) {
 		DBusMessage *reply = btd_error_failed(msg, gerr->message);
@@ -1382,7 +1422,7 @@ static DBusMessage *disconnect_service(DBusConnection *conn, DBusMessage *msg,
 
 	DBG("");
 
-	if(!prim) {
+	if (!prim) {
 		DBusMessage *reply = btd_error_failed(msg, gerr->message);
 		g_error_free(gerr);
 		return reply;
@@ -1391,6 +1431,7 @@ static DBusMessage *disconnect_service(DBusConnection *conn, DBusMessage *msg,
 
 	DBG(" %s", prim->path);
 	stop_discovery(prim, NULL);
+	primary_clean_dbus_msg(prim);
 	g_attrib_unref(prim->gatt->attrib);
 
 	return dbus_message_new_method_return(msg);
@@ -1506,6 +1547,8 @@ void attrib_client_disconnect(struct btd_device *device) {
 		return;
 
 	gatt = l->data;
-	attrib_disconnect(gatt);
 
+	g_slist_foreach(gatt->primary, (GFunc) primary_clean_dbus_msg, NULL);
+
+	attrib_disconnect(gatt);
 }
