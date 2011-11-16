@@ -471,6 +471,7 @@ static int l2cap_connect(struct gatt_service *gatt, GError **gerr,
 		return -1;
 
 	gatt->attrib = g_attrib_new(io);
+	gatt->attrib = g_attrib_ref(gatt->attrib);
 	g_io_channel_unref(io);
 	gatt->listen = listen;
 
