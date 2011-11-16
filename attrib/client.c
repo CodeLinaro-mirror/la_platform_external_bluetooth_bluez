@@ -914,6 +914,7 @@ static char *characteristic_list_to_string(GSList *chars)
 {
 	GString *characteristics;
 	GSList *l;
+	uint16_t cli_conf_handl = 0;
 
 	characteristics = g_string_new(NULL);
 
@@ -922,9 +923,10 @@ static char *characteristic_list_to_string(GSList *chars)
 		char chr_str[64];
 
 		memset(chr_str, 0, sizeof(chr_str));
+		cli_conf_handl = chr->desc.cli_conf_hndl;
 
-		snprintf(chr_str, sizeof(chr_str), "%04X#%02X#%04X#%s ",
-				chr->handle, chr->perm, chr->end, chr->type);
+		snprintf(chr_str, sizeof(chr_str), "%04X#%02X#%04X#%04X#%s ",
+				chr->handle, chr->perm, chr->end, cli_conf_handl, chr->type);
 
 		characteristics = g_string_append(characteristics, chr_str);
 	}
@@ -979,8 +981,8 @@ static GSList *string_to_characteristic_list(struct primary *prim,
 
 		chr = g_new0(struct characteristic, 1);
 
-		ret = sscanf(chars[i], "%04hX#%02hhX#%04hX#%s", &chr->handle,
-				&chr->perm, &chr->end, chr->type);
+		ret = sscanf(chars[i], "%04hX#%02hhX#%04hX#%04hX#%s", &chr->handle,
+				&chr->perm, &chr->end, &chr->desc.cli_conf_hndl, chr->type);
 		if (ret < 4) {
 			g_free(chr);
 			continue;
@@ -1190,6 +1192,8 @@ static void descriptor_cb(guint8 status, const guint8 *pdu, guint16 plen,
 			g_free(qfmt);
 	}
 
+	store_characteristics(gatt, current->prim);
+
 	att_data_list_free(list);
 done:
 	g_attrib_unref(gatt->attrib);
@@ -1280,7 +1284,6 @@ static void char_discovered_cb(GSList *characteristics, guint8 status,
 	if (previous_end)
 		*previous_end = att->end;
 
-	store_characteristics(gatt, prim);
 	register_characteristics(prim);
 
 	update_all_chars(prim);
