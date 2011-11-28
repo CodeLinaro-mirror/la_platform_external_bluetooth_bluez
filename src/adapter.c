@@ -397,11 +397,15 @@ static void adapter_remove_discov_timeout(struct btd_adapter *adapter)
 
 static gboolean discov_timeout_handler(gpointer user_data)
 {
+	const char *modestr;
 	struct btd_adapter *adapter = user_data;
 
 	adapter->discov_timeout_id = 0;
 
 	adapter_ops->set_discoverable(adapter->dev_id, FALSE);
+
+	modestr = mode2str(MODE_CONNECTABLE);
+	write_device_mode(&adapter->bdaddr, modestr);
 
 	return FALSE;
 }
