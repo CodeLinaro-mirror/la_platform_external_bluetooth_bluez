@@ -49,6 +49,7 @@
 #include "client.h"
 
 #define CHAR_INTERFACE "org.bluez.Characteristic"
+#define GENERIC_ATT_PROFILE "00001801-0000-1000-8000-00805f9b34fb"
 
 struct gatt_service {
 	struct btd_device *dev;
@@ -76,6 +77,7 @@ struct primary {
 	struct att_primary *att;
 	DBusMessage *discovery_msg;
 	guint	discovery_timer;
+	gboolean connected;
 	char *path;
 	GSList *chars;
 	GSList *watchers;
@@ -174,10 +176,11 @@ static void characteristics_clean_dbus_msg(gpointer user_data) {
 	chr->msg = NULL;
 }
 
-static void primary_clean_dbus_msg(gpointer user_data) {
+static void primary_clean(gpointer user_data) {
 	struct primary *prim = user_data;
 	g_slist_foreach(prim->chars, (GFunc) characteristics_clean_dbus_msg, NULL);
 	prim->discovery_msg = NULL;
+	prim->connected = FALSE;
 }
 
 static int gatt_dev_cmp(gconstpointer a, gconstpointer b)
@@ -438,13 +441,14 @@ fail:
 }
 
 static int l2cap_connect(struct gatt_service *gatt, GError **gerr,
-								gboolean listen)
+				struct primary *prim,  gboolean listen)
 {
 	GIOChannel *io;
 
 	if (gatt->attrib != NULL) {
 		gatt->attrib = g_attrib_ref(gatt->attrib);
 		gatt->listen = listen;
+		prim->connected = TRUE;
 		return 0;
 	}
 
@@ -478,6 +482,8 @@ static int l2cap_connect(struct gatt_service *gatt, GError **gerr,
 	g_attrib_set_destroy_function(gatt->attrib, attrib_destroy, gatt);
 	g_attrib_set_disconnect_function(gatt->attrib, attrib_disconnect,
 									gatt);
+
+	prim->connected = TRUE;
 
 	return 0;
 }
@@ -567,7 +573,7 @@ static DBusMessage *register_watcher(DBusConnection *conn,
 							DBUS_TYPE_INVALID))
 		return btd_error_invalid_args(msg);
 
-	if (l2cap_connect(prim->gatt, &gerr, TRUE) < 0) {
+	if (l2cap_connect(prim->gatt, &gerr, prim, TRUE) < 0) {
 		DBusMessage *reply = btd_error_failed(msg, gerr->message);
 		g_error_free(gerr);
 		return reply;
@@ -756,7 +762,7 @@ static DBusMessage *set_value(DBusConnection *conn, DBusMessage *msg,
 
 	dbus_message_iter_get_fixed_array(&sub, &value, &len);
 
-	if (l2cap_connect(gatt, &gerr, FALSE) < 0) {
+	if (l2cap_connect(gatt, &gerr, chr->prim, FALSE) < 0) {
 		DBusMessage *reply = btd_error_failed(msg, gerr->message);
 		g_error_free(gerr);
 		return reply;
@@ -808,7 +814,7 @@ static DBusMessage *set_cli_conf(DBusConnection *conn, DBusMessage *msg,
 
 	dbus_message_iter_get_fixed_array(&sub, &value, &len);
 
-	if (l2cap_connect(gatt, &gerr, FALSE) < 0) {
+	if (l2cap_connect(gatt, &gerr, chr->prim, FALSE) < 0) {
 		DBusMessage *reply = btd_error_failed(msg, gerr->message);
 		g_error_free(gerr);
 		return reply;
@@ -924,7 +930,7 @@ static DBusMessage *fetch_value(DBusConnection *conn,
 		return reply;
 	}
 
-	if (l2cap_connect(gatt, &gerr, FALSE) < 0) {
+	if (l2cap_connect(gatt, &gerr, prim, FALSE) < 0) {
 		DBusMessage *reply = btd_error_failed(msg, gerr->message);
 		g_error_free(gerr);
 		return reply;
@@ -1356,7 +1362,7 @@ static DBusMessage *discover_char(DBusConnection *conn, DBusMessage *msg,
 		return reply;
 	}
 
-	if (l2cap_connect(prim->gatt, &gerr, TRUE) < 0) {
+	if (l2cap_connect(prim->gatt, &gerr, prim, TRUE) < 0) {
 		DBusMessage *reply = btd_error_failed(msg, gerr->message);
 		g_error_free(gerr);
 		return reply;
@@ -1419,6 +1425,8 @@ static DBusMessage *disconnect_service(DBusConnection *conn, DBusMessage *msg,
 								void *data)
 {
 	struct primary *prim = data;
+	GSList *lprim;
+	struct gatt_service *gatt = prim->gatt;
 	GError *gerr = NULL;
 
 	DBG("");
@@ -1432,9 +1440,23 @@ static DBusMessage *disconnect_service(DBusConnection *conn, DBusMessage *msg,
 
 	DBG(" %s", prim->path);
 	stop_discovery(prim, NULL);
-	primary_clean_dbus_msg(prim);
+	primary_clean(prim);
+
+	for (lprim = gatt->primary, prim = NULL; lprim;
+						lprim = lprim->next) {
+		prim = lprim->data;
+
+		/* Ignore the state of generic service */
+		if ( !g_strcmp0(GENERIC_ATT_PROFILE,
+				prim->att->uuid))
+			continue;
+
+		if (prim->connected)
+			goto done;
+	}
 	g_attrib_unref(prim->gatt->attrib);
 
+done:
 	return dbus_message_new_method_return(msg);
 }
 
@@ -1549,7 +1571,7 @@ void attrib_client_disconnect(struct btd_device *device) {
 
 	gatt = l->data;
 
-	g_slist_foreach(gatt->primary, (GFunc) primary_clean_dbus_msg, NULL);
+	g_slist_foreach(gatt->primary, (GFunc) primary_clean, NULL);
 
 	attrib_disconnect(gatt);
 }
