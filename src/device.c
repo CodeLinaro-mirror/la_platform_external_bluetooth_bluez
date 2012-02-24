@@ -2396,8 +2396,14 @@ void device_simple_pairing_complete(struct btd_device *device, uint8_t status)
 {
 	struct authentication_req *auth = device->authr;
 
+	DBG(" status %d", status);
 	if (auth && auth->type == AUTH_TYPE_NOTIFY && auth->agent)
 		agent_cancel(auth->agent);
+
+	if (status) {
+		DBG("cancelling auth process");
+		device_bonding_complete(device, status);
+	}
 }
 
 static void device_auth_req_free(struct btd_device *device)
