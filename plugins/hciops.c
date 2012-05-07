@@ -1336,13 +1336,13 @@ static int get_io_cap(int index, bdaddr_t *bdaddr, uint8_t *cap, uint8_t *auth)
 
 		/* Update the modified authorization level in the
 		 * kernel space. */
-		set_auth_requirements(&dev->bdaddr, bdaddr, auth);
 
 	}
 
 done:
 	*cap = conn->loc_cap;
 	*auth = conn->loc_auth;
+	set_auth_requirements(&dev->bdaddr, bdaddr, auth);
 
 	DBG("final authentication requirement is 0x%02x", *auth);
 
