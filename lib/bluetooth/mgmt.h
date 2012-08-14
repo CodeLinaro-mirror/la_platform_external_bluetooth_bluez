@@ -295,6 +295,7 @@ struct mgmt_ev_device_connected {
 #define MGMT_EV_DEVICE_DISCONNECTED	0x000C
 struct mgmt_ev_device_disconnected {
 	bdaddr_t bdaddr;
+	uint8_t reason;
 } __packed;
 
 #define MGMT_EV_CONNECT_FAILED		0x000D
