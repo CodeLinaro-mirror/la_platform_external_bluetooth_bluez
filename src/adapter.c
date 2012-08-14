@@ -3862,7 +3862,7 @@ int btd_adapter_stop(struct btd_adapter *adapter)
 
 	while (adapter->connections) {
 		struct btd_device *device = adapter->connections->data;
-		adapter_remove_connection(adapter, device);
+		adapter_remove_connection(adapter, device, 0);
 	}
 
 	if (adapter->scan_mode == (SCAN_PAGE | SCAN_INQUIRY)) {
@@ -4615,7 +4615,8 @@ void adapter_add_connection(struct btd_adapter *adapter,
 }
 
 void adapter_remove_connection(struct btd_adapter *adapter,
-						struct btd_device *device)
+						struct btd_device *device,
+						uint8_t reason)
 {
 	DBG("");
 
@@ -4624,7 +4625,7 @@ void adapter_remove_connection(struct btd_adapter *adapter,
 		return;
 	}
 
-	device_remove_connection(device, connection);
+	device_remove_connection(device, connection, reason);
 
 	adapter->connections = g_slist_remove(adapter->connections, device);
 
