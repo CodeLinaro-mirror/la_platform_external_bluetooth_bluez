@@ -522,6 +522,10 @@ static void *_out_buf_thread_func(void *context)
                 if (ret < 0) {
                     if (ret != -EINPROGRESS)   //not a Signaling start
                         LOGE("%s: a2dp_write failed (%d)\n", __func__, ret);
+                    if ( ret == -EINPROGRESS) {
+                        LOGE( "Sleep for frames/sampling freq %d",frames);
+                        usleep(((frames * 1000) / out->sample_rate) * 1000 ); //frames /sampling
+                    }
                     /* skip pending frames in case of write error */
                     _out_inc_rd_idx_locked(out, frames);
                     break;
