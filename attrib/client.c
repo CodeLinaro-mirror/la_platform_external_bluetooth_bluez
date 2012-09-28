@@ -458,6 +458,11 @@ static void connect_cb(GIOChannel *chan, GError *gerr, gpointer user_data)
 
 	DBG("");
 
+	if(gerr) {
+		DBG("gerr message %s",gerr->message);
+		return;
+	}
+
 	if (gatt)
 		attrib = device_get_attrib(gatt->dev);
 
