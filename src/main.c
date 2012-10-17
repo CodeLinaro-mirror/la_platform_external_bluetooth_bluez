@@ -96,6 +96,7 @@ static void parse_config(GKeyFile *config)
 	char *str;
 	int val;
 	gboolean boolean;
+	char le_support[PROPERTY_VALUE_MAX];
 
 	if (!config)
 		return;
@@ -228,6 +229,14 @@ static void parse_config(GKeyFile *config)
 		g_clear_error(&err);
 	else
 		main_opts.le = boolean;
+
+#ifdef ANDROID
+	property_get("ro.bluetooth.le.disable", le_support, "false");
+	if (!strcmp(le_support, "true")) {
+		main_opts.attrib_server = 0;
+		main_opts.le = 0;
+	}
+#endif
 
 	main_opts.link_mode = HCI_LM_ACCEPT;
 
