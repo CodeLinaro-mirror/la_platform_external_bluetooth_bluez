@@ -25,6 +25,8 @@
 #include <pthread.h>
 #include <stdint.h>
 #include <sys/time.h>
+#include <sys/prctl.h>
+#include <utils/threads.h>
 
 #include <cutils/log.h>
 #include <cutils/str_parms.h>
@@ -487,6 +489,7 @@ static void *_out_buf_thread_func(void *context)
     struct astream_out *out = (struct astream_out *)context;
 
     pthread_mutex_lock(&out->buf_lock);
+    prctl(PR_SET_NAME, (unsigned long)"SBC_thread", 0, 0, 0);
 
     while(!out->buf_thread_exit) {
         size_t frames;
