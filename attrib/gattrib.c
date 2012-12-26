@@ -450,6 +450,8 @@ static gboolean received_data(GIOChannel *io, GIOCondition cond, gpointer data)
 		if (bt_io_set(io, BT_IO_L2CAP, NULL,
 				BT_IO_OPT_SEC_LEVEL, sec_level,
 				BT_IO_OPT_INVALID)) {
+			/* can_write_data will decrement ref cnt */
+			g_attrib_ref(attrib);
 			goto done;
 		}
 	}
