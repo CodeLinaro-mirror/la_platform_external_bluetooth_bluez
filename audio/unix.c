@@ -310,11 +310,7 @@ static void stream_state_changed(struct avdtp_stream *stream,
 		break;
 	case AVDTP_STATE_OPEN:
 		DBG("new state and old state are %d, %d", new_state, old_state);
-		if ((old_state == AVDTP_STATE_STREAMING) &&
-		    (client->local_suspend == FALSE)) {
-			DBG("a2dp_resume being called as remote suspend triggered");
-			g_timeout_add(RESUME_TIMEOUT, a2dp_local_resume, client);
-		}
+		break;
 	default:
 		break;
 	}
