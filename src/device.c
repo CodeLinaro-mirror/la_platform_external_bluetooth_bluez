@@ -1271,6 +1271,18 @@ void device_remove_connection(struct btd_device *device, DBusConnection *conn,
 		DEVICE_INTERFACE, "Connected",
 		DBUS_TYPE_BYTE, &conn_state, 2);
 
+	if (!(device->paired)) {
+		attrib_client_unregister(device);
+
+		g_slist_foreach(device->services, (GFunc) g_free, NULL);
+		g_slist_free(device->services);
+		device->services = NULL;
+
+		g_slist_foreach(device->primaries, (GFunc) g_free, NULL);
+		g_slist_free(device->primaries);
+		device->primaries = NULL;
+	}
+
 	attrib_client_disconnect(device);
 
 	g_free(conn_state);
@@ -1607,6 +1619,14 @@ void device_remove(struct btd_device *device, gboolean remove_stored)
 	device->drivers = NULL;
 
 	attrib_client_unregister(device);
+
+	g_slist_foreach(device->services, (GFunc) g_free, NULL);
+	g_slist_free(device->services);
+	device->services = NULL;
+
+	g_slist_foreach(device->primaries, (GFunc) g_free, NULL);
+	g_slist_free(device->primaries);
+	device->primaries = NULL;
 
 	btd_device_unref(device);
 }
@@ -2340,15 +2360,10 @@ static void primary_cb(GSList *services, guint8 status, gpointer user_data)
 
 	device_probe_drivers(device, uuids);
 
-	attrib_client_unregister(device);
-
-	g_slist_foreach(device->services, (GFunc) g_free, NULL);
-	g_slist_free(device->services);
-	device->services = NULL;
-
-	g_slist_foreach(device->primaries, (GFunc) g_free, NULL);
-	g_slist_free(device->primaries);
-	device->primaries = NULL;
+	if (device->services) {
+		DBG(" Services exists in the device cache");
+		gatt_services_changed(device);
+	}
 
 	device_register_services(req->conn, device, g_slist_copy(services), -1);
 
@@ -2414,6 +2429,11 @@ int device_browse_primary(struct btd_device *device, DBusConnection *conn,
 
 	if (device->browse)
 		return -EBUSY;
+
+	if (device->discov_timer) {
+		DBG("Discovery timer already set. Wait for discovery");
+		return -EALREADY;
+	}
 
 	req = g_new0(struct browse_req, 1);
 	req->device = btd_device_ref(device);
@@ -2634,12 +2654,12 @@ static gboolean start_discovery(gpointer user_data)
 	if (!device->connected)
 		return FALSE;
 
+	device->discov_timer = 0;
+
 	if (device_get_type(device) == DEVICE_TYPE_LE)
 		device_browse_primary(device, NULL, NULL, TRUE);
 	else
 		device_browse_sdp(device, NULL, NULL, NULL, TRUE);
-
-	device->discov_timer = 0;
 
 	return FALSE;
 }
