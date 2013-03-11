@@ -2860,6 +2860,8 @@ static int add_opush_record(struct btd_adapter *adapter)
 	sdp_record_t *record;
 	uint8_t u8 = 12;
 	sdp_data_t *channel;
+	uint16_t psm = 0x1487;
+	sdp_data_t *goepsm = NULL;
 #ifdef ANDROID
 	uint8_t formats[] = { 0x01, 0x02, 0xff };
 #else
@@ -2883,7 +2885,7 @@ static int add_opush_record(struct btd_adapter *adapter)
 	sdp_set_service_classes(record, svclass_id);
 
 	sdp_uuid16_create(&profile[0].uuid, OBEX_OBJPUSH_PROFILE_ID);
-	profile[0].version = 0x0100;
+	profile[0].version = 0x0102;
 	pfseq = sdp_list_append(0, profile);
 	sdp_set_profile_descs(record, pfseq);
 
@@ -2900,6 +2902,10 @@ static int add_opush_record(struct btd_adapter *adapter)
 	sdp_uuid16_create(&obex_uuid, OBEX_UUID);
 	proto[2] = sdp_list_append(0, &obex_uuid);
 	apseq = sdp_list_append(apseq, proto[2]);
+	goepsm = sdp_data_alloc(SDP_UINT16, &psm);
+	if(goepsm){
+		sdp_attr_add(record, SDP_ATTR_GOEP_L2CAP_PSM, goepsm);
+        }
 
 	aproto = sdp_list_append(0, apseq);
 	sdp_set_access_protos(record, aproto);
