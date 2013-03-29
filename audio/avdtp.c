@@ -2561,7 +2561,6 @@ static void avdtp_confirm_cb(GIOChannel *chan, gpointer data)
 	bdaddr_t src, dst;
 	int perr;
 	GError *err = NULL;
-	struct avdtp_server *server;
 
 
 	bt_io_get(chan, BT_IO_L2CAP, &err,
@@ -2576,17 +2575,6 @@ static void avdtp_confirm_cb(GIOChannel *chan, gpointer data)
 	}
 
 	DBG("AVDTP: incoming connect from %s", address);
-
-	//check if there already exists a a2dp connection, discard the second device connection
-	server = find_server(servers, &src);
-	if (!server) {
-		goto drop;
-	}
-
-	if (server->sessions) {
-		DBG("AVDTP: reject incoming connect from 2nd device %s", address);
-		goto drop;
-	}
 
 	session = avdtp_get_internal(&src, &dst);
 	if (!session)
