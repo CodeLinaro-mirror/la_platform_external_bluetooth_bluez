@@ -609,6 +609,8 @@ static void avctp_disconnected(struct audio_device *dev)
 	if (!control)
 		return;
 
+	control->mdata->reg_playback_status = FALSE;
+
 	if (control->io) {
 		g_io_channel_shutdown(control->io, TRUE, NULL);
 		g_io_channel_unref(control->io);
