@@ -4,6 +4,7 @@
  *
  *  Copyright (C) 2006-2010  Nokia Corporation
  *  Copyright (C) 2004-2010  Marcel Holtmann <marcel@holtmann.org>
+ *  Copyright (C) 2013  The Linux Foundation. All rights reserved.
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -1320,7 +1321,7 @@ static void auth_cb(DBusError *derr, void *user_data)
 		}
 	}
 
-	if (!bt_io_accept(control->io, avctp_connect_cb, control,
+	if (control->io && !bt_io_accept(control->io, avctp_connect_cb, control,
 								NULL, &err)) {
 		error("bt_io_accept: %s", err->message);
 		g_error_free(err);
