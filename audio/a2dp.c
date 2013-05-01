@@ -726,14 +726,16 @@ static gboolean sbc_getcap_ind(struct avdtp *session, struct avdtp_local_sep *se
 								NULL, 0);
 		*caps = g_slist_append(*caps, delay_reporting);
 	}
-	memset(&scms_t_cap, 0, sizeof(scms_t_cap));
-	scms_t_cap.cp_type_lsb = (CP_TYPE_SCMS_T & 0xFF);
-	scms_t_cap.cp_type_msb = (CP_TYPE_SCMS_T >> 8) & 0xFF;
-	media_scms_t = avdtp_service_cap_new(AVDTP_CONTENT_PROTECTION,
+
+	if (avdtp_get_protection_req(session)) {
+		DBG("Adding SCMST to GetCapabilities response!");
+		memset(&scms_t_cap, 0, sizeof(scms_t_cap));
+		scms_t_cap.cp_type_lsb = (CP_TYPE_SCMS_T & 0xFF);
+		scms_t_cap.cp_type_msb = (CP_TYPE_SCMS_T >> 8) & 0xFF;
+		media_scms_t = avdtp_service_cap_new(AVDTP_CONTENT_PROTECTION,
 						&scms_t_cap, 2);
-
-	*caps = g_slist_append(*caps, media_scms_t);
-
+		*caps = g_slist_append(*caps, media_scms_t);
+	}
 	return TRUE;
 }
 
