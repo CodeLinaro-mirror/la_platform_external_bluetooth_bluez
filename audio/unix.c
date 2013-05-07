@@ -73,6 +73,7 @@ struct a2dp_data {
 	struct avdtp *session;
 	struct avdtp_stream *stream;
 	struct a2dp_sep *sep;
+	guint timer_id;
 };
 
 struct headset_data {
@@ -105,6 +106,14 @@ static int unix_sock = -1;
 static void client_free(struct unix_client *client)
 {
 	DBG("client_free(%p)", client);
+
+	struct a2dp_data *a2dp = &client->d.a2dp;
+
+	if (a2dp && a2dp->timer_id > 0){
+		DBG("Remove the timer for a2dp_resume");
+		g_source_remove(a2dp->timer_id);
+		a2dp->timer_id = 0;
+	}
 
 	if (client->cancel && client->dev && client->req_id > 0)
 		client->cancel(client->dev, client->req_id);
@@ -226,6 +235,52 @@ static service_type_t select_service(struct audio_device *dev, const char *inter
 	return TYPE_NONE;
 }
 
+static void a2dp_local_resume_complete(struct avdtp *session,
+				struct avdtp_error *err, void *user_data)
+{
+	struct unix_client *client = user_data;
+	struct a2dp_data *a2dp = &client->d.a2dp;
+
+	if (!err)
+		return;
+
+	error("resume failed with err %d", err);
+	if (a2dp->timer_id >0){
+		DBG("Remove the timer for a2dp_resume");
+		g_source_remove(a2dp->timer_id);
+		a2dp->timer_id = 0;
+	}
+	if (client->cb_id > 0) {
+		avdtp_stream_remove_cb(a2dp->session, a2dp->stream,
+					client->cb_id);
+		client->cb_id = 0;
+	}
+
+	if (a2dp->sep) {
+		a2dp_sep_unlock(a2dp->sep, a2dp->session);
+		a2dp->sep = NULL;
+	}
+
+	avdtp_unref(a2dp->session);
+	a2dp->session = NULL;
+	a2dp->stream = NULL;
+}
+
+static gboolean a2dp_local_resume(void *data)
+{
+	struct unix_client *client = data;
+	struct a2dp_data *a2dp = &client->d.a2dp;
+	DBG("a2dp_resume being called");
+
+	if (!a2dp)
+		return TRUE;
+
+	a2dp_resume(a2dp->session, a2dp->sep,
+				a2dp_local_resume_complete, client);
+
+	return FALSE;
+}
+
 static void stream_state_changed(struct avdtp_stream *stream,
 					avdtp_state_t old_state,
 					avdtp_state_t new_state,
@@ -257,6 +312,21 @@ static void stream_state_changed(struct avdtp_stream *stream,
 		break;
 	case AVDTP_STATE_OPEN:
 		DBG("new state and old state are %d, %d", new_state, old_state);
+		if ((old_state == AVDTP_STATE_STREAMING) &&
+		    (client->local_suspend == FALSE)) {
+			uint8_t match = 0;
+			read_special_map_devaddr("remote_suspend", &client->dev->dst, &match);
+			if (a2dp->timer_id > 0){
+				DBG("Remove the timer for a2dp_resume first and then start new");
+				g_source_remove(a2dp->timer_id);
+				a2dp->timer_id = 0;
+			}
+			if (match) {
+				DBG("a2dp_resume being called as remote suspend triggered");
+				a2dp->timer_id = g_timeout_add(RESUME_TIMEOUT, a2dp_local_resume,
+								client);
+			}
+		}
 	default:
 		break;
 	}
