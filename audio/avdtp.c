@@ -2191,8 +2191,10 @@ static gboolean session_cb(GIOChannel *chan, GIOCondition cond,
 
 	header = (void *) session->buf;
 
-	if (cond & (G_IO_HUP | G_IO_ERR))
+	if (cond & (G_IO_HUP | G_IO_ERR)) {
+		DBG("G_IO_HUP | G_IO_ERR recieved, aborting!");
 		goto failed;
+	}
 
 	fd = g_io_channel_unix_get_fd(chan);
 	size = read(fd, session->buf, session->imtu);
