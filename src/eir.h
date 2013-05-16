@@ -4,6 +4,7 @@
  *
  *  Copyright (C) 2011  Nokia Corporation
  *  Copyright (C) 2011  Marcel Holtmann <marcel@holtmann.org>
+ *  Copyright (C) 2010-2013 The Linux Foundation. All rights reserved
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -32,6 +33,8 @@ struct eir_data {
 	int flags;
 	char *name;
 	gboolean name_complete;
+	uint16_t vid;
+	uint16_t pid;
 };
 
 void eir_data_free(struct eir_data *eir);
