@@ -4019,7 +4019,7 @@ avdtp_state_t avdtp_sep_get_state(struct avdtp_local_sep *sep)
 
 void avdtp_get_peers(struct avdtp *session, bdaddr_t *src, bdaddr_t *dst)
 {
-	if (src)
+	if (src && (session->server != NULL))
 		bacpy(src, &session->server->src);
 	if (dst)
 		bacpy(dst, &session->dst);
