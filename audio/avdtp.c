@@ -4,7 +4,7 @@
  *
  *  Copyright (C) 2006-2010  Nokia Corporation
  *  Copyright (C) 2004-2010  Marcel Holtmann <marcel@holtmann.org>
- *  Copyright (C) 2010, The Linux Foundation. All rights reserved.
+ *  Copyright (C) 2010,2013 The Linux Foundation. All rights reserved.
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -1233,7 +1233,7 @@ void avdtp_unref(struct avdtp *session)
 {
 	struct avdtp_server *server;
 
-	if (!session)
+	if ((!session) || (session->ref == 0))
 		return;
 
 	session->ref--;
