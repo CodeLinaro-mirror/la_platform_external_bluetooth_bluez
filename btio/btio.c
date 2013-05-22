@@ -43,6 +43,16 @@
 		g_set_error(gerr, BT_IO_ERROR, BT_IO_ERROR_FAILED, \
 				str ": %s (%d)", strerror(err), err)
 
+#ifdef ENABLE_DEBUG
+#include <utils/Log.h>
+#define LOG_TAG "btio"
+#define DBG(fmt, arg...) do { \
+       ALOGE("%s:%s()" fmt, __FILE__, __func__, ##arg); \
+}  while (0)
+#else
+#define DBG(fmt, arg...)
+#endif
+
 #define DEFAULT_DEFER_TIMEOUT 30
 
 struct set_opts {
@@ -1251,6 +1261,8 @@ gboolean bt_io_accept(GIOChannel *io, BtIOConnect connect, gpointer user_data,
 	int sock;
 	char c;
 	struct pollfd pfd;
+	int poll_ret = 0;
+	int retry_count = 0;
 
 	sock = g_io_channel_unix_get_fd(io);
 
@@ -1258,19 +1270,44 @@ gboolean bt_io_accept(GIOChannel *io, BtIOConnect connect, gpointer user_data,
 	pfd.fd = sock;
 	pfd.events = POLLOUT;
 
-	if (poll(&pfd, 1, 0) < 0) {
-		ERROR_FAILED(err, "poll", errno);
+	DBG("Enter");
+retry:
+	if (retry_count == 200) {
+		DBG("Retried for last 2 seconds, giving up");
+		DBG("read fails, errno: %d", errno);
 		return FALSE;
 	}
 
+	if ((poll_ret = poll(&pfd, 1, 0)) < 0) {
+		ERROR_FAILED(err, "poll", errno);
+		return FALSE;
+	} else {
+		DBG("poll_ret: %d", poll_ret);
+	}
+
 	if (!(pfd.revents & POLLOUT)) {
+		DBG("socket not writable yet, need to go for read");
 		if (read(sock, &c, 1) < 0) {
-			ERROR_FAILED(err, "read", errno);
-			return FALSE;
+			DBG("read returns errno: %d", errno);
+			if (errno == EAGAIN) {
+				DBG("Try again");
+				retry_count++;
+				// Sleep for 10ms before retry
+				usleep(10000);
+				goto retry;
+			}
+			else {
+				ERROR_FAILED(err, "read", errno);
+				DBG("read fails, errno: %d", errno);
+				return FALSE;
+			}
 		}
 	}
 
+	DBG("poll sets POLLOUT, socket is writable");
+
 	accept_add(io, connect, user_data, destroy);
+	DBG("Exit");
 
 	return TRUE;
 }
