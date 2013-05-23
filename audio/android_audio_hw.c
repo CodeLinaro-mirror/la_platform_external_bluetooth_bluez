@@ -247,7 +247,7 @@ static bool _out_validate_parms(struct astream_out *out, audio_format_t format,
     return true;
 }
 
-static int out_standby_stream_locked(struct astream_out *out)
+static int out_standby_stream_locked(struct astream_out *out, bool suspend)
 {
     int ret = 0;
     int attempts = MAX_WRITE_COMPLETION_ATTEMPTS;
@@ -266,7 +266,7 @@ static int out_standby_stream_locked(struct astream_out *out)
     ALOGE_IF(attempts == 0, "out_standby_stream_locked() a2dp_write() would not stop!!!");
 
     ALOGV_IF(!out->bt_enabled, "Standby skip stop: enabled %d", out->bt_enabled);
-    if (out->bt_enabled) {
+    if (out->bt_enabled && suspend) {
         max_latency = 0;
         ret = a2dp_stop(out->data);
     }
@@ -277,7 +277,7 @@ static int out_standby_stream_locked(struct astream_out *out)
 
 static int out_close_stream_locked(struct astream_out *out)
 {
-    out_standby_stream_locked(out);
+    out_standby_stream_locked(out, true);
 
     if (out->data) {
         ALOGV("%s: calling a2dp_cleanup()", __func__);
@@ -293,7 +293,7 @@ static int out_standby(struct audio_stream *stream)
     struct astream_out *out = (struct astream_out *)stream;
 
     pthread_mutex_lock(&out->lock);
-    out_standby_stream_locked(out);
+    out_standby_stream_locked(out, true);
     pthread_mutex_unlock(&out->lock);
 
     return 0;
@@ -483,7 +483,7 @@ err_init:
 err_bt_disabled:
     pthread_mutex_unlock(&out->buf_lock);
     ALOGV("!!!! write error");
-    out_standby_stream_locked(out);
+    out_standby_stream_locked(out, true);
     pthread_mutex_unlock(&out->lock);
 
     /* XXX: simulate audio output timing in case of error?!?! */
@@ -611,7 +611,7 @@ static int _out_a2dp_suspend(struct astream_out *out, bool suspend)
 {
     int liba2dpstop = 0;
     pthread_mutex_lock(&out->lock);
-    liba2dpstop = out_standby_stream_locked(out);
+    liba2dpstop = out_standby_stream_locked(out, suspend);
     if (!(liba2dpstop) || !(suspend))
         out->suspended = suspend;
     pthread_mutex_unlock(&out->lock);
