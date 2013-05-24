@@ -138,6 +138,9 @@ static GSList *servers = NULL;
 static GSList *setups = NULL;
 static unsigned int cb_id = 0;
 
+static uint8_t high_quality_default_bitpool(uint8_t freq, uint8_t mode);
+static uint8_t medium_quality_default_bitpool(uint8_t freq, uint8_t mode);
+
 static struct a2dp_setup *setup_ref(struct a2dp_setup *setup)
 {
 	setup->ref++;
@@ -515,6 +518,8 @@ static gboolean sbc_getcap_ind(struct avdtp *session, struct avdtp_local_sep *se
 	struct avdtp_service_capability *media_scms_t;
 	struct avdtp_content_protection_capability scms_t_cap;
 	struct sbc_codec_cap sbc_cap;
+	bdaddr_t src, dst;
+	gboolean edr_capability;
 
 	if (a2dp_sep->type == AVDTP_SEP_TYPE_SINK)
 		DBG("Sink %p: Get_Capability_Ind", sep);
@@ -558,8 +563,16 @@ static gboolean sbc_getcap_ind(struct avdtp *session, struct avdtp_local_sep *se
 					SBC_ALLOCATION_SNR );
 
 	sbc_cap.min_bitpool = MIN_BITPOOL;
-	sbc_cap.max_bitpool = MAX_BITPOOL;
 
+	avdtp_get_peers(session, &src, &dst);
+	edr_capability = a2dp_read_edrcapability(&src, &dst);
+	if (edr_capability) {
+		sbc_cap.max_bitpool = high_quality_default_bitpool(SBC_SAMPLING_FREQ_48000,
+							SBC_CHANNEL_MODE_JOINT_STEREO);
+	} else {
+		sbc_cap.max_bitpool = medium_quality_default_bitpool(SBC_SAMPLING_FREQ_48000,
+							SBC_CHANNEL_MODE_JOINT_STEREO);
+	}
 	media_codec = avdtp_service_cap_new(AVDTP_MEDIA_CODEC, &sbc_cap,
 						sizeof(sbc_cap));
 
