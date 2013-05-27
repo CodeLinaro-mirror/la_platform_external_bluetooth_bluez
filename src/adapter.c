@@ -4393,7 +4393,8 @@ void adapter_emit_device_found(struct btd_adapter *adapter,
 	} else
 		alias = g_strdup(dev->alias);
 
-	emit_device_found(adapter->path, paddr,
+	if ((dev->vid == 0) && (dev->pid == 0)) {
+		emit_device_found(adapter->path, paddr,
 			"Address", DBUS_TYPE_STRING, &paddr,
 			"Class", DBUS_TYPE_UINT32, &dev->class,
 			"Icon", DBUS_TYPE_STRING, &icon,
@@ -4405,7 +4406,22 @@ void adapter_emit_device_found(struct btd_adapter *adapter,
 			"UUIDs", DBUS_TYPE_ARRAY, &dev->uuids, uuid_count,
 			"Type", DBUS_TYPE_STRING, &dev_type,
 			NULL);
-
+	} else {
+		emit_device_found(adapter->path, paddr,
+			"Address", DBUS_TYPE_STRING, &paddr,
+			"Class", DBUS_TYPE_UINT32, &dev->class,
+			"Icon", DBUS_TYPE_STRING, &icon,
+			"RSSI", DBUS_TYPE_INT16, &rssi,
+			"Name", DBUS_TYPE_STRING, &dev->name,
+			"Alias", DBUS_TYPE_STRING, &alias,
+			"LegacyPairing", DBUS_TYPE_BOOLEAN, &dev->legacy,
+			"Paired", DBUS_TYPE_BOOLEAN, &paired,
+			"UUIDs", DBUS_TYPE_ARRAY, &dev->uuids, uuid_count,
+			"Type", DBUS_TYPE_STRING, &dev_type,
+			"VID", DBUS_TYPE_UINT16, &dev->vid,
+			"PID", DBUS_TYPE_UINT16, &dev->pid,
+			NULL);
+	}
 	g_free(alias);
 }
 
@@ -4491,7 +4507,9 @@ void adapter_update_device_from_info(struct btd_adapter *adapter,
 		g_free(dev->name);
 		dev->name = g_strdup(name);
 	}
-
+	/*to make sure vid and pid is not emitted from this path*/
+	dev->vid = 0;
+	dev->pid = 0;
 	/* FIXME: check if other information was changed before emitting the
 	 * signal */
 	adapter_emit_device_found(adapter, dev);
@@ -4500,7 +4518,8 @@ void adapter_update_device_from_info(struct btd_adapter *adapter,
 void adapter_update_found_devices(struct btd_adapter *adapter, bdaddr_t *bdaddr,
 			int8_t rssi, uint32_t class, const char *name,
 			const char *alias, gboolean legacy, gboolean le,
-			int flags, GSList *services, name_status_t name_status)
+			int flags, GSList *services, name_status_t name_status,
+			uint16_t pid, uint16_t vid)
 {
 	struct remote_dev_info *dev;
 	gboolean new_dev;
@@ -4543,6 +4562,12 @@ void adapter_update_found_devices(struct btd_adapter *adapter, bdaddr_t *bdaddr,
 		dev->rssi = rssi;
 	else
 		return;
+
+	/*Assign vid and pid info from did info*/
+	dev->vid = vid;
+	dev->pid = pid;
+
+	DBG("vid: 0x%04x pid: 0x%04x", dev->vid, dev->pid);
 
 	adapter->found_devices = g_slist_sort(adapter->found_devices,
 						(GCompareFunc) dev_rssi_cmp);
