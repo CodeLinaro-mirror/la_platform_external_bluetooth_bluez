@@ -379,7 +379,9 @@ static void primary_attrib_destroy(gpointer user_data)
 	DBG("");
 	DBG("%s", prim->path);
 
-	g_slist_foreach(prim->chars, characteristic_clean, &on_destroy);
+	if(prim->chars)
+		g_slist_foreach(prim->chars, characteristic_clean, &on_destroy);
+
 	prim->connected = FALSE;
 
 	if (prim->discovery_msg) {
@@ -398,7 +400,8 @@ static void attrib_destroy(gpointer user_data)
 
 	DBG("");
 
-	g_slist_foreach(gatt->primary, (GFunc) primary_attrib_destroy, NULL);
+        if(gatt->primary)
+		g_slist_foreach(gatt->primary, (GFunc) primary_attrib_destroy, NULL);
 
 	device_set_attrib(gatt->dev, NULL);
 }
