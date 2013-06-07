@@ -3498,6 +3498,30 @@ struct avdtp_stream *avdtp_get_stream(struct avdtp_remote_sep *sep)
 	return sep->stream;
 }
 
+GIOChannel *avdtp_get_stream_io(struct avdtp_stream *stream)
+{
+	if (stream) {
+		return stream->io;
+	}
+	return NULL;
+}
+
+uint16_t avdtp_get_stream_imtu(struct avdtp_stream *stream)
+{
+	if (stream) {
+		return stream->imtu;
+	}
+	return 0;
+}
+
+uint16_t avdtp_get_stream_omtu(struct avdtp_stream *stream)
+{
+	if (stream) {
+		return stream->omtu;
+	}
+	return 0;
+}
+
 struct avdtp_service_capability *avdtp_service_cap_new(uint8_t category,
 							void *data, int length)
 {
