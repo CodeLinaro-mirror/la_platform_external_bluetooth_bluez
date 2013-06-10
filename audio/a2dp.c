@@ -4,7 +4,7 @@
  *
  *  Copyright (C) 2006-2010  Nokia Corporation
  *  Copyright (C) 2004-2010  Marcel Holtmann <marcel@holtmann.org>
- *  Copyright (C) 2010,2012 The Linux Foundation. All rights reserved.
+ *  Copyright (C) 2010,2012-2013 The Linux Foundation. All rights reserved.
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -194,6 +194,9 @@ static void setup_free(struct a2dp_setup *s)
 
 static void setup_unref(struct a2dp_setup *setup)
 {
+	if ((!setup) || (setup->ref == 0))
+		return;
+
 	setup->ref--;
 
 	DBG("%p: ref=%d", setup, setup->ref);
