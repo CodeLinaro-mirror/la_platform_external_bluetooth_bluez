@@ -4,7 +4,7 @@
  *
  *  Copyright (C) 2006-2007  Nokia Corporation
  *  Copyright (C) 2004-2008  Marcel Holtmann <marcel@holtmann.org>
- *  Copyright (C) 2010-2012, The Linux Foundation. All rights reserved.
+ *  Copyright (C) 2010-2013, The Linux Foundation. All rights reserved.
  *
  *
  *  This library is free software; you can redistribute it and/or
@@ -929,7 +929,7 @@ static int bluetooth_init(struct bluetooth_data *data)
 
 	data->server.fd = sk;
 	data->server.events = POLLIN;
-	data->state = A2DP_STATE_INITIALIZED;
+	set_state(data, A2DP_STATE_INITIALIZED);
 
 	return 0;
 }
