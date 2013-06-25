@@ -4,6 +4,7 @@
  *
  *  Copyright (C) 2010  Nokia Corporation
  *  Copyright (C) 2010  Marcel Holtmann <marcel@holtmann.org>
+ *  Copyright (C) 2013  The Linux Foundation. All rights reserved
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -27,6 +28,7 @@
 #define GATT_SND_SVC_UUID		0x2801
 #define GATT_INCLUDE_UUID		0x2802
 #define GATT_CHARAC_UUID		0x2803
+#define GATT_REPORT_REFERENCE_UUID	0x2908
 
 /* GATT Characteristic Types */
 #define GATT_CHARAC_DEVICE_NAME			0x2A00

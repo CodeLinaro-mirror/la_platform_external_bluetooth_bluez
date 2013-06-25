@@ -4,7 +4,7 @@
  *
  *  Copyright (C) 2010  Nokia Corporation
  *  Copyright (C) 2010  Marcel Holtmann <marcel@holtmann.org>
- *  Copyright (C) 2011-2012 The Linux Foundation. All rights reserved.
+ *  Copyright (C) 2011-2013 The Linux Foundation. All rights reserved.
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -49,6 +49,8 @@
 #include "gatt.h"
 #include "client.h"
 
+#define SUPPORT_REPORT_REF
+
 #define CHAR_INTERFACE "org.bluez.Characteristic"
 #define GENERIC_ATT_PROFILE "00001801-0000-1000-8000-00805f9b34fb"
 
@@ -88,6 +90,10 @@ struct descriptor {
 	char *desc;
 	uint16_t cli_conf_hndl;
 	uint16_t cli_conf;
+#ifdef SUPPORT_REPORT_REF
+	uint16_t report_ref_hndl;
+	uint16_t report_ref;
+#endif
 	struct format *format;
 };
 
@@ -254,6 +260,11 @@ static void append_char_dict(DBusMessageIter *iter, struct characteristic *chr)
 	/* FIXME: Only if remote has Client Configuration */
 	dict_append_entry(&dict, "ClientConfiguration", DBUS_TYPE_UINT16,
 					  &(chr->desc.cli_conf));
+
+#ifdef SUPPORT_REPORT_REF
+	dict_append_entry(&dict, "ReportReference", DBUS_TYPE_UINT16,
+					  &(chr->desc.report_ref));
+#endif
 
 	dict_append_entry(&dict, "Properties", DBUS_TYPE_BYTE,
 					  &(chr->perm));
@@ -1003,6 +1014,7 @@ static DBusMessage *fetch_value(DBusConnection *conn,
 	}
 
 	if (l2cap_connect(gatt, &gerr, prim, TRUE) < 0) {
+		DBG("Failed to make L2 connect");
 		DBusMessage *reply = btd_error_failed(msg, gerr->message);
 		g_error_free(gerr);
 		return reply;
@@ -1014,6 +1026,7 @@ static DBusMessage *fetch_value(DBusConnection *conn,
 
 	chr->msg = dbus_message_ref(msg);
 
+	DBG("read_char");
 	gatt_read_char(device_get_attrib(gatt->dev), chr->handle, 0, update_char_value, qvalue);
 
 	return NULL;
@@ -1034,7 +1047,9 @@ static char *characteristic_list_to_string(GSList *chars)
 	GString *characteristics;
 	GSList *l;
 	uint16_t cli_conf_handl = 0;
-
+#ifdef SUPPORT_REPORT_REF
+	uint16_t report_ref_handl = 0;
+#endif
 	characteristics = g_string_new(NULL);
 
 	for (l = chars; l; l = l->next) {
@@ -1043,13 +1058,16 @@ static char *characteristic_list_to_string(GSList *chars)
 
 		memset(chr_str, 0, sizeof(chr_str));
 		cli_conf_handl = chr->desc.cli_conf_hndl;
-
+#ifdef SUPPORT_REPORT_REF
+		report_ref_handl = chr->desc.report_ref_hndl;
+		snprintf(chr_str, sizeof(chr_str), "%04X#%02X#%04X#%04X#%04X#%s ",
+			chr->handle, chr->perm, chr->end, cli_conf_handl, report_ref_handl, chr->type);
+#else
 		snprintf(chr_str, sizeof(chr_str), "%04X#%02X#%04X#%04X#%s ",
-				chr->handle, chr->perm, chr->end, cli_conf_handl, chr->type);
-
+			chr->handle, chr->perm, chr->end, cli_conf_handl, chr->type);
+#endif
 		characteristics = g_string_append(characteristics, chr_str);
 	}
-
 	return g_string_free(characteristics, FALSE);
 }
 
@@ -1100,22 +1118,25 @@ static GSList *string_to_characteristic_list(struct primary *prim,
 
 		chr = g_new0(struct characteristic, 1);
 
+#ifdef SUPPORT_REPORT_REF
+		ret = sscanf(chars[i], "%04hX#%02hhX#%04hX#%04hX#%04hX#%s", &chr->handle,
+			&chr->perm, &chr->end, &chr->desc.cli_conf_hndl, &chr->desc.report_ref_hndl, chr->type);
+		if (ret < 5) {
+#else
 		ret = sscanf(chars[i], "%04hX#%02hhX#%04hX#%04hX#%s", &chr->handle,
-				&chr->perm, &chr->end, &chr->desc.cli_conf_hndl, chr->type);
+			&chr->perm, &chr->end, &chr->desc.cli_conf_hndl, chr->type);
 		if (ret < 4) {
+#endif
 			g_free(chr);
 			continue;
 		}
-
 		chr->prim = prim;
 		chr->path = g_strdup_printf("%s/characteristic%04x",
-						prim->path, chr->handle);
+				prim->path, chr->handle);
 
 		l = g_slist_append(l, chr);
 	}
-
 	g_strfreev(chars);
-
 	return l;
 }
 
@@ -1245,6 +1266,35 @@ done:
 	g_free(current);
 }
 
+#ifdef SUPPORT_REPORT_REF
+static void update_char_report_reference(guint8 status, const guint8 *pdu, guint16 len,
+								gpointer user_data)
+{
+	struct query_data *current = user_data;
+	struct gatt_service *gatt = current->prim->gatt;
+	struct characteristic *chr = current->chr;
+
+	DBG("status=%x, len=%d", status, len);
+
+	if (status != 0)
+		goto done;
+
+	if (len != 3)
+		goto done;
+
+        memcpy(&chr->desc.report_ref, pdu + 1, 2);
+
+	store_attribute(gatt, current->handle,
+				GATT_REPORT_REFERENCE_UUID,
+				(void *)&chr->desc.report_ref, sizeof(chr->desc.report_ref));
+
+done:
+	g_attrib_unref(device_get_attrib(gatt->dev));
+	g_free(current);
+
+}
+#endif
+
 static int uuid_desc16_cmp(bt_uuid_t *uuid, guint16 desc)
 {
 	bt_uuid_t u16;
@@ -1312,9 +1362,15 @@ static void descriptor_cb(guint8 status, const guint8 *pdu, guint16 plen,
 			attrib = g_attrib_ref(attrib);
 			gatt_read_char(attrib, handle, 0,
 						update_char_format, qfmt);
+#ifdef SUPPORT_REPORT_REF
+		} else if (uuid_desc16_cmp(&uuid, GATT_REPORT_REFERENCE_UUID) == 0) {
+			DBG("read report reference UUID");
+                        attrib = g_attrib_ref(attrib);
+			gatt_read_char(attrib, handle, 0,
+					update_char_report_reference, qfmt);
+#endif
 		} else
 			g_free(qfmt);
-
 	}
 
 	device_set_attrib(gatt->dev, attrib);
@@ -1447,9 +1503,11 @@ static DBusMessage *discover_char(DBusConnection *conn, DBusMessage *msg,
 	if (prim->discovery_msg) {
 		DBusMessage *reply = btd_error_failed(msg, "Discovery already in progress");
 		g_error_free(gerr);
+		DBG("discovery in progress");
 		return reply;
 	}
 
+	DBG("to create l2cap connection");
 	if (l2cap_connect(prim->gatt, &gerr, prim, TRUE) < 0) {
 		DBusMessage *reply = btd_error_failed(msg, gerr->message);
 		g_error_free(gerr);
