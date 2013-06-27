@@ -4,7 +4,7 @@
  *
  *  Copyright (C) 2006-2010  Nokia Corporation
  *  Copyright (C) 2004-2010  Marcel Holtmann <marcel@holtmann.org>
- *  Copyright (C) 2010, The Linux Foundation. All rights reserved
+ *  Copyright (C) 2010-2013  The Linux Foundation. All rights reserved
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -89,6 +89,8 @@ struct remote_dev_info {
 	GSList *services;
 	uint8_t bdaddr_type;
 	int flags;
+	uint16_t pid;
+	uint16_t vid;
 };
 
 void btd_adapter_start(struct btd_adapter *adapter);
@@ -131,7 +133,8 @@ void adapter_update_device_from_info(struct btd_adapter *adapter,
 void adapter_update_found_devices(struct btd_adapter *adapter, bdaddr_t *bdaddr,
 			int8_t rssi, uint32_t class, const char *name,
 			const char *alias, gboolean legacy, gboolean le,
-			int flags, GSList *services, name_status_t name_status);
+			int flags, GSList *services, name_status_t name_status,
+			uint16_t pid, uint16_t vid);
 int adapter_remove_found_device(struct btd_adapter *adapter, bdaddr_t *bdaddr);
 void adapter_emit_device_found(struct btd_adapter *adapter,
 						struct remote_dev_info *dev);

@@ -4,7 +4,7 @@
  *
  *  Copyright (C) 2006-2010  Nokia Corporation
  *  Copyright (C) 2004-2010  Marcel Holtmann <marcel@holtmann.org>
- *  Copyright (C) 2011-2012, The Linux Foundation. All rights reserved
+ *  Copyright (C) 2011-2013, The Linux Foundation. All rights reserved
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -64,6 +64,8 @@ struct eir_data {
 	int flags;
 	char *name;
 	gboolean name_complete;
+        uint16_t vid;
+        uint16_t pid;
 };
 
 static gboolean get_adapter_and_device(bdaddr_t *src, bdaddr_t *dst,
@@ -373,6 +375,7 @@ static int parse_eir_data(struct eir_data *eir, uint8_t *eir_data,
 	uuid_t service;
 	char *uuid_str;
 	unsigned int i;
+	gboolean is_primary_did_fetched = FALSE;
 
 	eir->flags = -1;
 
@@ -415,6 +418,33 @@ static int parse_eir_data(struct eir_data *eir, uint8_t *eir_data,
 			else
 				eir->name = g_strdup("");
 			eir->name_complete = eir_data[1] == EIR_NAME_COMPLETE;
+			break;
+		case EIR_DEVICE_ID:
+			if (is_primary_did_fetched == FALSE) {
+				DBG("Process EIR DID");
+				if (field_len != 9) {
+					error("Invalid EIR Len");
+					break;
+				}
+
+				DBG("EIR data: ");
+				int count = 0;
+				for (; count <= field_len; count++) {
+					DBG("0x%02x", eir_data[count]);
+				}
+
+				/*Assign VID*/
+				uint16_t val = eir_data[5];
+				eir->vid = (val << 8) + eir_data[4];
+				DBG("0x%04x", eir->vid);
+
+				/*Assign PID*/
+				val = eir_data[7];
+				eir->pid = (val << 8) + eir_data[6];
+				DBG("0x%04x", eir->pid);
+
+				is_primary_did_fetched = TRUE;
+			}
 			break;
 		}
 
@@ -605,7 +635,8 @@ void btd_event_device_found(bdaddr_t *local, bdaddr_t *peer, uint8_t type,
 
 	adapter_update_found_devices(adapter, peer, rssi, class, dev_name,
 					alias, legacy, le, eir_data.flags,
-					eir_data.services, name_status);
+					eir_data.services, name_status,
+					eir_data.pid, eir_data.vid);
 
 	free_eir_data(&eir_data);
 	free(name);
@@ -695,6 +726,9 @@ void btd_event_remote_name(bdaddr_t *local, bdaddr_t *peer, uint8_t status,
 
 	dev_info = adapter_search_found_devices(adapter, &match);
 	if (dev_info) {
+		/*make sure vid and pid are set to 0, so that its not emitted*/
+		dev_info->vid = 0;
+		dev_info->pid = 0;
 		g_free(dev_info->name);
 		dev_info->name = g_strdup(name);
 		adapter_emit_device_found(adapter, dev_info);
