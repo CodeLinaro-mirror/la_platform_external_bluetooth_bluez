@@ -747,6 +747,10 @@ static int avdtp_write(struct bluetooth_data *data)
 #ifdef ENABLE_TIMING
 	begin2 = get_microseconds();
 #endif
+	if (data->stream.fd == -1){
+		ERR("Error : A2DP seems to be STOPPED: Skip Poll");
+		return 0;
+	}
 	ret = poll(&data->stream, 1, POLL_TIMEOUT);
 #ifdef ENABLE_TIMING
 	end2 = get_microseconds();
@@ -779,6 +783,10 @@ static int avdtp_write(struct bluetooth_data *data)
 #ifdef ENABLE_TIMING
 		begin2 = get_microseconds();
 #endif
+		if (data->stream.fd == -1){
+			ERR("Error : A2DP seems to be STOPPED: Skip send");
+			return 0;
+		}
 		ret = send(data->stream.fd, data->buffer, data->count, MSG_NOSIGNAL);
 #ifdef ENABLE_TIMING
 		end2 = get_microseconds();
