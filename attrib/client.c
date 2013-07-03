@@ -1977,6 +1977,9 @@ int client_create_le_io_connect(struct btd_device *device)
 	if (device_get_attrib(device))
 		return -1;
 
+        gatt->listen = true;
+        DBG("gatt->listen :%d", gatt->listen);
+
 	adapter_get_address(device_get_adapter(device), &src);
 
 	io = bt_io_connect(BT_IO_L2CAP, connect_cb,
