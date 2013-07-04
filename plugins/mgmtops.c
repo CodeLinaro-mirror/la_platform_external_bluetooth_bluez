@@ -4,7 +4,7 @@
  *
  *  Copyright (C) 2010  Nokia Corporation
  *  Copyright (C) 2010  Marcel Holtmann <marcel@holtmann.org>
- *  Copyright (C) 2011-2012, The Linux Foundation. All rights reserved.
+ *  Copyright (C) 2011-2013, The Linux Foundation. All rights reserved.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -2054,12 +2054,23 @@ static int mgmt_set_name(int index, const char *name)
 
 static int mgmt_cancel_resolve_name(int index, bdaddr_t *bdaddr)
 {
+	char buf[MGMT_HDR_SIZE + sizeof(struct mgmt_cp_cancel_resolve_name)];
+	struct mgmt_hdr *hdr = (void *) buf;
+	struct mgmt_cp_cancel_resolve_name *cp = (void *) &buf[sizeof(*hdr)];
 	char addr[18];
 
 	ba2str(bdaddr, addr);
 	DBG("index %d addr %s", index, addr);
+	memset(buf, 0, sizeof(buf));
+	hdr->opcode = htobs(MGMT_OP_CANCEL_RESOLVE_NAME);
+	hdr->len = htobs(sizeof(*cp));
+	hdr->index = htobs(index);
+	bacpy(&cp->bdaddr, bdaddr);
 
-	return -ENOSYS;
+	if (write(mgmt_sock, buf, sizeof(buf)) < 0)
+		return -errno;
+
+	return 0;
 }
 
 static int mgmt_fast_connectable(int index, gboolean enable)

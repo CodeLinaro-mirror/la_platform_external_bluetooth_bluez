@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2010  Nokia Corporation
  *  Copyright (C) 2010  Marcel Holtmann <marcel@holtmann.org>
- *  Copyright (C) 2011-2012, The Linux Foundation. All rights reserved.
+ *  Copyright (C) 2011-2013, The Linux Foundation. All rights reserved.
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -249,6 +249,11 @@ struct mgmt_cp_set_rssi_reporter {
 
 #define MGMT_OP_UNSET_RSSI_REPORTER 0x0023
 struct mgmt_cp_unset_rssi_reporter {
+	bdaddr_t bdaddr;
+} __packed;
+
+#define MGMT_OP_CANCEL_RESOLVE_NAME	0x0024
+struct mgmt_cp_cancel_resolve_name {
 	bdaddr_t bdaddr;
 } __packed;
 
