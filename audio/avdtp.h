@@ -246,6 +246,12 @@ struct avdtp_service_capability *avdtp_get_remote_sep_protection(struct avdtp_re
 
 struct avdtp_stream *avdtp_get_stream(struct avdtp_remote_sep *sep);
 
+GIOChannel *avdtp_get_stream_io(struct avdtp_stream *stream);
+
+uint16_t avdtp_get_stream_imtu(struct avdtp_stream *stream);
+
+uint16_t avdtp_get_stream_omtu(struct avdtp_stream *stream);
+
 int avdtp_discover(struct avdtp *session, avdtp_discover_cb_t cb,
 			void *user_data);
 

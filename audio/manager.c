@@ -147,10 +147,10 @@ gboolean server_is_enabled(bdaddr_t *src, uint16_t svc)
 	case HANDSFREE_AGW_SVCLASS_ID:
 		return enabled.gateway;
 	case AUDIO_SINK_SVCLASS_ID:
+		return enabled.sink;
 #ifdef ANDROID
 	case ADVANCED_AUDIO_SVCLASS_ID:
 #endif
-		return enabled.sink;
 	case AUDIO_SOURCE_SVCLASS_ID:
 		return enabled.source;
 	case AV_REMOTE_TARGET_SVCLASS_ID:
@@ -208,14 +208,14 @@ static void handle_uuid(const char *uuidstr, struct audio_device *device)
 		if (enabled.gateway && (device->gateway == NULL))
 			device->gateway = gateway_init(device);
 		break;
-#ifdef ANDROID
-	case ADVANCED_AUDIO_SVCLASS_ID:
-#endif
 	case AUDIO_SINK_SVCLASS_ID:
 		DBG("Found Audio Sink");
 		if (device->sink == NULL)
 			device->sink = sink_init(device);
 		break;
+#ifdef ANDROID
+	case ADVANCED_AUDIO_SVCLASS_ID:
+#endif
 	case AUDIO_SOURCE_SVCLASS_ID:
 		DBG("Found Audio Source");
 		if (device->source == NULL)
@@ -1122,7 +1122,7 @@ static void media_server_remove(struct btd_adapter *adapter)
 static struct btd_device_driver audio_driver = {
 	.name	= "audio",
 	.uuids	= BTD_UUIDS(HSP_HS_UUID, HFP_HS_UUID, HSP_AG_UUID, HFP_AG_UUID,
-			ADVANCED_AUDIO_UUID, A2DP_SOURCE_UUID, A2DP_SINK_UUID,
+			ADVANCED_AUDIO_UUID, A2DP_SINK_UUID, A2DP_SOURCE_UUID,
 			AVRCP_TARGET_UUID, AVRCP_REMOTE_UUID),
 	.probe	= audio_probe,
 	.remove	= audio_remove,

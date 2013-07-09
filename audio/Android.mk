@@ -20,7 +20,10 @@ LOCAL_SRC_FILES:= \
 	source.c \
 	telephony-dummy.c \
 	transport.c \
-	unix.c
+	unix.c \
+	../sbc/sbc_primitives.c \
+	../sbc/sbc_primitives_neon.c \
+	../sbc/sbc.c \
 
 LOCAL_CFLAGS:= \
 	-DVERSION=\"4.93\" \
@@ -31,6 +34,7 @@ LOCAL_CFLAGS:= \
 
 
 LOCAL_C_INCLUDES:= \
+	$(LOCAL_PATH)/../sbc \
 	$(LOCAL_PATH)/../lib \
 	$(LOCAL_PATH)/../gdbus \
 	$(LOCAL_PATH)/../src \

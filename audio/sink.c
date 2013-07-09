@@ -135,7 +135,6 @@ static void sink_set_state(struct audio_device *dev, sink_state_t new_state)
 		emit_property_changed(dev->conn, dev->path,
 					AUDIO_SINK_INTERFACE, "State",
 					DBUS_TYPE_STRING, &state_str);
-
 	DBG("State changed %s: %s -> %s", dev->path, str_state[old_state],
 		str_state[new_state]);
 

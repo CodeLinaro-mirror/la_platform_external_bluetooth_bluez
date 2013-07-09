@@ -1708,7 +1708,7 @@ static gboolean record_has_uuid(const sdp_record_t *rec,
 static gboolean is_audio_driver(char *dest_uuid)
 {
 	char  **uuids =  BTD_UUIDS(HSP_HS_UUID, HFP_HS_UUID, HSP_AG_UUID, HFP_AG_UUID,
-					ADVANCED_AUDIO_UUID, A2DP_SOURCE_UUID, A2DP_SINK_UUID,
+					ADVANCED_AUDIO_UUID, A2DP_SINK_UUID, A2DP_SOURCE_UUID,
 					AVRCP_TARGET_UUID, AVRCP_REMOTE_UUID);
 	char **uuid;
 

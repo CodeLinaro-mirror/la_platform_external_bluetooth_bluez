@@ -104,7 +104,7 @@ static void source_set_state(struct audio_device *dev, source_state_t new_state)
 	const char *state_str;
 	source_state_t old_state = source->state;
 	GSList *l;
-
+	DBG ("source_set_state: new_state: %d", new_state);
 	source->state = new_state;
 
 	state_str = state2str(new_state);
@@ -168,7 +168,7 @@ static void stream_state_changed(struct avdtp_stream *stream,
 
 	if (err)
 		return;
-
+	DBG("stream_state_changed: oldstate: %d, newstate: %d", old_state, new_state);
 	switch (new_state) {
 	case AVDTP_STATE_IDLE:
 		if (source->disconnect) {
@@ -417,7 +417,7 @@ static DBusMessage *source_disconnect(DBusConnection *conn,
 	struct source *source = device->source;
 	struct pending_request *pending;
 	int err;
-
+	DBG("A2dpSink: source disconnect called");
 	if (!source->session)
 		return btd_error_not_connected(msg);
 

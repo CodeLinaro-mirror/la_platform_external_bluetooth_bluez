@@ -4,7 +4,7 @@
  *
  *  Copyright (C) 2006-2010  Nokia Corporation
  *  Copyright (C) 2004-2010  Marcel Holtmann <marcel@holtmann.org>
- *  Copyright (C) 2010,2012 The Linux Foundation. All rights reserved.
+ *  Copyright (C) 2010,2012-2013 The Linux Foundation. All rights reserved.
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include <errno.h>
 
+
 #include <dbus/dbus.h>
 #include <glib.h>
 
@@ -51,6 +52,17 @@
 #include "sdpd.h"
 #include "../src/device.h"
 #include "storage.h"
+#include "rtp.h"
+#include "../sbc/sbc.h"
+#include <pthread.h>
+#include <sys/prctl.h>
+#include <poll.h>
+
+#define ENABLE_PCM_SINK_DUMP
+#define PCM_OUTPUT_FILE "/data/misc/bluetoothd/output_pcm_dump"
+#define MAX_CHUNK_SIZE 11520000  //36 less than chunkSize 48000*2*2*60 pcm data for 1 min.
+FILE *dumpPcmFp = NULL;
+
 /* The duration that streams without users are allowed to stay in
  * STREAMING state. */
 #define SUSPEND_TIMEOUT 5
@@ -77,6 +89,14 @@
 #define _3_SLOT_EDR_ACL_BYTE 0x04
 #define _5_SLOT_EDR_ACL_BYTE 0x05
 
+#ifndef AUDIO_CHANNEL_OUT_MONO
+#define AUDIO_CHANNEL_OUT_MONO 0x01
+#endif
+
+#ifndef AUDIO_CHANNEL_OUT_STEREO
+#define AUDIO_CHANNEL_OUT_STEREO 0x03
+#endif
+
 struct a2dp_sep {
 	struct a2dp_server *server;
 	struct media_endpoint *endpoint;
@@ -92,6 +112,13 @@ struct a2dp_sep {
 	gboolean suspending;
 	gboolean starting;
 	gboolean remote_suspend;
+	pthread_t streaming_thread;	/*Handles a2dp streaming for sink role*/
+	void *buffer;			/*Stores a2dp sbc encoded data for sink*/
+	size_t buffer_size;
+	sbc_t sbc;
+	size_t codesize;
+	size_t frame_length;
+	gboolean track_opened;
 };
 
 struct a2dp_setup_cb {
@@ -134,9 +161,31 @@ struct a2dp_server {
 	gboolean sbc_quality_high;
 };
 
+struct pcm_header {
+	char chunkId[4];
+	uint32_t  chunkSize;
+	char format[4];
+	char subchunk1ID[4];
+	uint32_t  subchunk1Size;
+	uint16_t audioFormat;
+	uint16_t numChannels;
+	uint32_t sampleRate;
+	uint32_t byteRate;
+	uint16_t blockAlign;
+	uint16_t bitsPerSample;
+	char subchunk2ID[4];
+	uint32_t subchunk2Size;
+};
+
 static GSList *servers = NULL;
 static GSList *setups = NULL;
 static unsigned int cb_id = 0;
+uint32_t bytes_written = 0;
+uint16_t numberChannels = 0;
+uint32_t trackFrequency = 0;
+
+static uint8_t high_quality_default_bitpool(uint8_t freq, uint8_t mode);
+static uint8_t medium_quality_default_bitpool(uint8_t freq, uint8_t mode);
 
 static struct a2dp_setup *setup_ref(struct a2dp_setup *setup)
 {
@@ -433,6 +482,100 @@ done:
 	return FALSE;
 }
 
+void set_a2dp_sbc_config(struct sbc_codec_cap *data, struct a2dp_sep *sep) {
+
+	struct sbc_codec_cap *config = data;
+	struct a2dp_sep *a2dp_sep = sep;
+
+	sbc_init(&a2dp_sep->sbc, 0);
+
+	switch (config->frequency) {
+		case SBC_SAMPLING_FREQ_16000:
+			a2dp_sep->sbc.frequency = SBC_FREQ_16000;
+			break;
+		case SBC_SAMPLING_FREQ_32000:
+			a2dp_sep->sbc.frequency = SBC_FREQ_32000;
+			break;
+		case SBC_SAMPLING_FREQ_44100:
+			a2dp_sep->sbc.frequency = SBC_FREQ_44100;
+			break;
+		case SBC_SAMPLING_FREQ_48000:
+			a2dp_sep->sbc.frequency = SBC_FREQ_48000;
+			break;
+		default:
+			DBG("A2dpSink: improper channel_mode");
+			break;
+	}
+
+	switch (config->channel_mode) {
+		case SBC_CHANNEL_MODE_MONO:
+			a2dp_sep->sbc.mode = SBC_MODE_MONO;
+			break;
+		case SBC_CHANNEL_MODE_DUAL_CHANNEL:
+			a2dp_sep->sbc.mode = SBC_MODE_DUAL_CHANNEL;
+			break;
+		case SBC_CHANNEL_MODE_STEREO:
+			a2dp_sep->sbc.mode = SBC_MODE_STEREO;
+			break;
+		case SBC_CHANNEL_MODE_JOINT_STEREO:
+			a2dp_sep->sbc.mode = SBC_MODE_JOINT_STEREO;
+			break;
+		default:
+			DBG("A2dpSink: improper channel_mode");
+			break;
+	}
+
+	switch (config->allocation_method) {
+		case SBC_ALLOCATION_SNR:
+			a2dp_sep->sbc.allocation = SBC_AM_SNR;
+			break;
+		case SBC_ALLOCATION_LOUDNESS:
+			a2dp_sep->sbc.allocation = SBC_AM_LOUDNESS;
+			break;
+		default:
+			DBG("A2dpSink: improper allocation_method");
+			break;
+	}
+
+	switch (config->subbands) {
+		case SBC_SUBBANDS_4:
+			a2dp_sep->sbc.subbands = SBC_SB_4;
+			break;
+		case SBC_SUBBANDS_8:
+			a2dp_sep->sbc.subbands = SBC_SB_8;
+			break;
+		default:
+			DBG("A2dpSink: improper subbands");
+			break;
+	}
+
+	switch (config->block_length) {
+		case SBC_BLOCK_LENGTH_4:
+			a2dp_sep->sbc.blocks = SBC_BLK_4;
+			break;
+		case SBC_BLOCK_LENGTH_8:
+			a2dp_sep->sbc.blocks = SBC_BLK_8;
+			break;
+		case SBC_BLOCK_LENGTH_12:
+			a2dp_sep->sbc.blocks = SBC_BLK_12;
+			break;
+		case SBC_BLOCK_LENGTH_16:
+			a2dp_sep->sbc.blocks = SBC_BLK_16;
+			break;
+		default:
+			DBG("A2dpSink: improper block_length");
+			break;
+	}
+
+	a2dp_sep->sbc.bitpool = 2;
+	a2dp_sep->codesize = sbc_get_codesize(&a2dp_sep->sbc);
+	a2dp_sep->frame_length = sbc_get_frame_length(&a2dp_sep->sbc);
+
+	DBG("A2dpSink: SBC parameters:\n\tallocation=%u\n\tsubbands=%u\n\tblocks=%u\n\tbitpool=%u\n",
+	a2dp_sep->sbc.allocation, a2dp_sep->sbc.subbands, a2dp_sep->sbc.blocks, a2dp_sep->sbc.bitpool);
+}
+
+
 static gboolean sbc_setconf_ind(struct avdtp *session,
 					struct avdtp_local_sep *sep,
 					struct avdtp_stream *stream,
@@ -492,6 +635,10 @@ static gboolean sbc_setconf_ind(struct avdtp *session,
 
 		sbc_cap = (void *) codec_cap;
 
+		if (a2dp_sep->type == AVDTP_SEP_TYPE_SINK) {
+			set_a2dp_sbc_config(sbc_cap, a2dp_sep);
+		}
+
 		if (sbc_cap->min_bitpool < MIN_BITPOOL ||
 					sbc_cap->max_bitpool > MAX_BITPOOL) {
 			setup->err = g_new(struct avdtp_error, 1);
@@ -534,7 +681,15 @@ static gboolean sbc_getcap_ind(struct avdtp *session, struct avdtp_local_sep *se
 	sbc_cap.cap.media_codec_type = A2DP_CODEC_SBC;
 
 #ifdef ANDROID
-	sbc_cap.frequency = SBC_SAMPLING_FREQ_48000;
+	if (a2dp_sep->type == AVDTP_SEP_TYPE_SOURCE) {
+		sbc_cap.frequency = SBC_SAMPLING_FREQ_48000;
+	} else {
+		DBG("A2dpSink: acknowledging support for all frequencies");
+		sbc_cap.frequency = ( SBC_SAMPLING_FREQ_48000 |
+				SBC_SAMPLING_FREQ_44100 |
+				SBC_SAMPLING_FREQ_32000 |
+				SBC_SAMPLING_FREQ_16000 );
+	}
 #else
 	sbc_cap.frequency = ( SBC_SAMPLING_FREQ_48000 |
 				SBC_SAMPLING_FREQ_44100 |
@@ -937,6 +1092,13 @@ static gboolean open_ind(struct avdtp *session, struct avdtp_local_sep *sep,
 		DBG("Sink %p: Open_Ind", sep);
 	else
 		DBG("Source %p: Open_Ind", sep);
+
+	if (a2dp_sep->type == AVDTP_SEP_TYPE_SINK) {
+		if (a2dp_sep->track_opened) {
+			a2dp_sep->track_opened = FALSE;
+		}
+	}
+
 	return TRUE;
 }
 
@@ -980,6 +1142,200 @@ static gboolean suspend_timeout(struct a2dp_sep *sep)
 	return FALSE;
 }
 
+static int a2dp_get_track_frequency(sbc_t *data) {
+	sbc_t *sbc = data;
+	int freq = 16000;
+	switch (sbc->frequency) {
+		case SBC_FREQ_16000:
+			freq = 16000;
+			break;
+		case SBC_FREQ_32000:
+			freq = 32000;
+			break;
+		case SBC_FREQ_44100:
+			freq = 44100;
+			break;
+		case SBC_FREQ_48000:
+			freq = 48000;
+			break;
+	}
+	return freq;
+}
+
+static int a2dp_get_track_channel_type(sbc_t *data) {
+	sbc_t *sbc = data;
+	int channel = AUDIO_CHANNEL_OUT_MONO;
+	switch (sbc->mode) {
+		case SBC_MODE_MONO:
+			channel = AUDIO_CHANNEL_OUT_MONO;
+			break;
+		case SBC_MODE_DUAL_CHANNEL:
+		case SBC_MODE_STEREO:
+		case SBC_MODE_JOINT_STEREO:
+			channel = AUDIO_CHANNEL_OUT_STEREO;
+			break;
+	}
+	return channel;
+}
+
+static void a2dp_allocate_buffer(struct a2dp_sep *input) {
+	struct a2dp_sep *a2dp_sep = input;
+	a2dp_sep->buffer_size = avdtp_get_stream_imtu(a2dp_sep->stream);
+	DBG("A2dpSink: stream imtu returned as: %u", a2dp_sep->buffer_size);
+	if (a2dp_sep->buffer) {
+		g_free(a2dp_sep->buffer);
+	}
+	a2dp_sep->buffer = g_malloc0(a2dp_sep->buffer_size);
+}
+
+static void a2dp_streaming_thread(void *input) {
+	struct a2dp_sep *a2dp_sep = input;
+	GIOChannel *io = NULL;
+	struct rtp_header *header;
+	struct rtp_payload *payload;
+	ssize_t length;
+	const void *source;
+	void *destination = NULL;
+	void *destHeader = NULL; // always points to start of destination buffer
+	uint32_t *tempBuf;
+	size_t length_to_decode;
+	size_t length_to_write = 0;
+	size_t totalWritten = 0;
+	struct pollfd pfd;
+	int poll_ret = 0;
+	io = avdtp_get_stream_io(a2dp_sep->stream);
+	int sk = NULL;
+	prctl(PR_SET_NAME, (int)"a2dp_streaming_thread", 0, 0, 0);
+	DBG("A2dpSink: In a2dp_streaming_thread");
+	if (io != NULL) {
+		DBG("A2dpSink: getting hold of a2dp_streaming socket");
+		sk = g_io_channel_unix_get_fd(io);
+		DBG("A2dpSink: a2dp_streaming socket: %d, stream->io: %d", sk, io);
+	}
+	if (sk == NULL) {
+		DBG("A2dpSink: Streaming socket creation fail");
+		return;
+	}
+
+	pfd.fd = sk;
+	pfd.events = POLLIN | POLLERR | POLLHUP | POLLNVAL;
+
+	a2dp_sep->buffer = NULL;
+
+	while(TRUE) {
+		a2dp_allocate_buffer(a2dp_sep); //allocates buffer to store sbc
+		header = a2dp_sep->buffer; //points to avdtp media header
+		payload = (struct rtp_payload*) ((uint8_t*) a2dp_sep->buffer + sizeof(*header));
+							// a2dp media packet header
+		length = 0;
+		if ((poll_ret = poll(&pfd, 1, -1)) < 0) {
+			DBG("poll failed:", errno);
+			break;
+		}
+		if ((pfd.revents & POLLERR) || (pfd.revents & POLLHUP) || (pfd.revents & POLLNVAL)) {
+			DBG("A2dpSink: poll throws ERR or HUP or NVAL");
+			break;
+		} else if (pfd.revents & POLLIN) {
+			DBG("A2dpSink: poll Returns POLLIN");
+			while (TRUE) {
+				if ((length = recv(sk, a2dp_sep->buffer, a2dp_sep->buffer_size, 0)) < 0) {
+					if ((errno == EINTR) || (errno == EAGAIN))
+						continue;
+					DBG("A2dpSink: recv throws err: %d", errno);
+				}
+				break;
+			}
+		} else {
+			DBG("A2dpSink: poll returns unknown error with ret: ", poll_ret);
+			break;
+		}
+		if (length <= 0) {
+			DBG("A2dpSink: A2dp sink disconnected!!!");
+			break;
+		}
+		DBG("A2dpSink: read %d bytes", length);
+		if (length > 0) {
+			DBG("A2dpSink: Going for sbc decode");
+			source = (uint8_t*) a2dp_sep->buffer + sizeof(*header) + sizeof(*payload);
+			length_to_decode = length - sizeof(*header) - sizeof(*payload);
+			//allocate memory for destination here!
+			if (destHeader) {
+				g_free(destHeader);
+			}
+			length_to_write = 10240; //TODO: need to decide on this size
+			destHeader = g_malloc0(length_to_write);
+			destination = destHeader;
+			totalWritten = 0; // used for dumping data to pcm file
+
+			DBG("A2dpSink: SBC parameters to be used for decode:\n\tallocation=%u\n\tsubbands=%u\n\tblocks=%u\n\tbitpool=%u\n",
+								a2dp_sep->sbc.allocation, a2dp_sep->sbc.subbands, a2dp_sep->sbc.blocks, a2dp_sep->sbc.bitpool);
+
+			while (length_to_decode > 0) {
+				size_t written;
+				ssize_t decoded;
+
+				decoded = sbc_decode(&a2dp_sep->sbc,
+									source, length_to_decode,
+									destination, length_to_write,
+									&written);
+
+				if (decoded <= 0) {
+					DBG("A2dpSink: SBC decoding error %d", decoded);
+					DBG("A2dpSink: Try next frame");
+					//return -1;
+					sbc_reinit(&a2dp_sep->sbc, 0);
+					break;
+				}
+
+				DBG("A2dpSink: SBC: decoded: %lu; written: %lu", (unsigned long) decoded, (unsigned long) written);
+				DBG("A2dpSink: SBC: frame_length: %lu; codesize: %lu", (unsigned long) a2dp_sep->frame_length, (unsigned long) a2dp_sep->codesize);
+
+				/* Reset frame length, it can be changed due to bitpool change */
+				a2dp_sep->frame_length = sbc_get_frame_length(&a2dp_sep->sbc);
+
+				if (!((size_t) decoded <= length_to_decode))
+					DBG("A2dpSink: SBC: decoded > length_to_decode, buzz off");
+
+				if ((size_t) decoded != a2dp_sep->frame_length)
+					DBG("A2dpSink: SBC: decoded != a2dp_sep->frame_length, buzz off");
+
+				if ((size_t) written != a2dp_sep->codesize)
+					DBG("A2dpSink: SBC: written != a2dp_sep->codesize, buzz off");
+
+				source = (const uint8_t*) source + decoded;
+				length_to_decode -= decoded;
+
+				destination = (uint8_t*) destination + written;
+				length_to_write -= written;
+
+				totalWritten += written;
+			}
+
+			tempBuf = (uint32_t *)destHeader;
+			DBG ("A2dpSink: totalWritten: %d", totalWritten);
+			if ((a2dp_sep->track_opened) && (totalWritten > 0)) {
+				int ret;
+				DBG ("A2dpSink: writing pcm data to Audio Track!!!");
+				ret = pcm_sink_write(destHeader, totalWritten);
+				DBG ("A2dpSink: pcm_sink_write returns: %d",ret);
+			}
+
+			DBG("A2dpSink: SBC parameters used for decode:\n\tallocation=%u\n\tsubbands=%u\n\tblocks=%u\n\tbitpool=%u\n",
+			a2dp_sep->sbc.allocation, a2dp_sep->sbc.subbands, a2dp_sep->sbc.blocks, a2dp_sep->sbc.bitpool);
+		}
+	}
+	DBG ("A2dpSink: Doing cleanup for a2dp_streaming_thread");
+	if (destHeader) {
+		g_free(destHeader);
+	}
+	if (a2dp_sep->buffer) {
+		g_free(a2dp_sep->buffer);
+	}
+	sbc_finish(&a2dp_sep->sbc);
+
+	DBG ("A2dpSink: exiting from a2dp_streaming_thread");
+}
+
 static gboolean start_ind(struct avdtp *session, struct avdtp_local_sep *sep,
 				struct avdtp_stream *stream, uint8_t *err,
 				void *user_data)
@@ -987,6 +1343,7 @@ static gboolean start_ind(struct avdtp *session, struct avdtp_local_sep *sep,
 	struct a2dp_sep *a2dp_sep = user_data;
 	struct a2dp_setup *setup;
 	struct audio_device *dev;
+	int sinkSetupErr = 0;
 
 	if (a2dp_sep->type == AVDTP_SEP_TYPE_SINK)
 		DBG("Sink %p: Start_Ind", sep);
@@ -998,10 +1355,45 @@ static gboolean start_ind(struct avdtp *session, struct avdtp_local_sep *sep,
 		finalize_resume(setup);
 
 	if (!a2dp_sep->locked) {
-		a2dp_sep->session = avdtp_ref(session);
-		a2dp_sep->suspend_timer = g_timeout_add_seconds(SUSPEND_TIMEOUT,
+		if (a2dp_sep->type != AVDTP_SEP_TYPE_SINK) {
+			a2dp_sep->session = avdtp_ref(session);
+			a2dp_sep->suspend_timer = g_timeout_add_seconds(SUSPEND_TIMEOUT,
 						(GSourceFunc) suspend_timeout,
 						a2dp_sep);
+		} else {
+			if (!a2dp_sep->remote_suspend) {
+				DBG("A2dpSink: create new session only if it is fresh start not resume");
+				a2dp_sep->session = avdtp_ref(session);
+			}
+		}
+	}
+
+	/*A2dpSink: Launch A2dp streaming thread for a2dp sink*/
+	DBG("A2dpSink: in start_ind");
+	//if (a2dp_sep->stream->lsep->info.type == AVDTP_SEP_TYPE_SINK) {
+	if (a2dp_sep->type == AVDTP_SEP_TYPE_SINK) {
+		if (!a2dp_sep->remote_suspend) { /*thread already launched!!*/
+			DBG("A2dpSink: launching streaming_thread test");
+			int track_frequency = a2dp_get_track_frequency(&a2dp_sep->sbc);
+			int track_channel_type = a2dp_get_track_channel_type(&a2dp_sep->sbc);
+			DBG("A2dpSink: track_channel_type = %d", track_channel_type);
+			DBG("A2dpSink: track_frequency = %d", track_frequency);
+			numberChannels = track_channel_type;
+			trackFrequency = track_frequency;
+			if (pcm_sink_init(track_frequency, track_channel_type) == -1) {
+				a2dp_sep->track_opened = FALSE;
+				DBG("A2dpSink: Track creation fails!!!");
+				return TRUE;
+			}
+			a2dp_sep->track_opened = TRUE;
+			DBG("A2dpSink: launching streaming_thread");
+			pthread_attr_t attr;
+			pthread_attr_init(&attr);
+			pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+			sinkSetupErr = pthread_create(&a2dp_sep->streaming_thread, &attr,
+							a2dp_streaming_thread, a2dp_sep);
+			DBG("A2dpSink: launching streaming_thread returns: %d", sinkSetupErr);
+		}
 	}
 
 	if (a2dp_sep->remote_suspend) {
@@ -1009,7 +1401,6 @@ static gboolean start_ind(struct avdtp *session, struct avdtp_local_sep *sep,
 		DBG("dev value is %p: ", dev);
 		a2dp_sep->remote_suspend = FALSE;
 	}
-
 
 	return TRUE;
 }
@@ -1059,11 +1450,11 @@ static gboolean suspend_ind(struct avdtp *session, struct avdtp_local_sep *sep,
 
 	dev = a2dp_get_dev(session);
 	DBG("dev value is %p: ", dev);
-	if (dev) {
-		control_suspend(dev);
+
+	if (a2dp_sep->type == AVDTP_SEP_TYPE_SINK) {
+		DBG("A2dpSink: marking remote_suspend as true");
 		a2dp_sep->remote_suspend = TRUE;
 	}
-
 	return TRUE;
 }
 
@@ -1140,6 +1531,13 @@ static gboolean close_ind(struct avdtp *session, struct avdtp_local_sep *sep,
 		DBG("*** Removing reconfig_timer_index");
 	}
 
+	if (a2dp_sep->type == AVDTP_SEP_TYPE_SINK) {
+		if (a2dp_sep->track_opened) {
+			a2dp_sep->track_opened = FALSE;
+			pcm_sink_stop();
+		}
+	}
+
 	finalize_setup_errno(setup, -ECONNRESET, finalize_suspend,
 							finalize_resume, NULL);
 
@@ -1192,6 +1590,12 @@ static void close_cfm(struct avdtp *session, struct avdtp_local_sep *sep,
 	else
 		DBG("Source %p: Close_Cfm", sep);
 
+	if (a2dp_sep->type == AVDTP_SEP_TYPE_SINK) {
+		if (a2dp_sep->track_opened) {
+			a2dp_sep->track_opened = FALSE;
+			pcm_sink_stop();
+		}
+	}
 	setup = find_setup_by_session(session);
 	if (!setup)
 		return;
@@ -2611,4 +3015,126 @@ gboolean a2dp_read_edrcapability(bdaddr_t *src, bdaddr_t *dst)
 			return FALSE;
 	}
 	return FALSE;
+}
+
+int pcm_sink_init(int trackFreq, int channelType)
+{
+#ifdef ENABLE_PCM_SINK_DUMP
+	time_t ltime;
+	char tstamp[16];
+	const struct tm *Tm;
+	char pcmDataFileName[256];
+	const char *format = "%Y%m%d_%H%M%S";
+	ltime = time(NULL);
+	Tm = localtime(&ltime);
+	strftime(tstamp, sizeof(tstamp), format, Tm);
+	snprintf(pcmDataFileName,sizeof(pcmDataFileName),"%s%s.pcm",PCM_OUTPUT_FILE,tstamp);
+	dumpPcmFp = fopen (pcmDataFileName, "ab");
+	if (dumpPcmFp == NULL) {
+		error("failed to open dumpPcmFp errno is  %d",errno);
+		return -1;
+	}
+
+
+	int channels = get_number_channel(channelType);
+	int byterate = (trackFreq * channels * 16)/8;
+	struct pcm_header p_head;
+	memset(&p_head,0,sizeof(p_head));
+	//p_head.chunkId[] = {'R','I','F','F'};
+	p_head.chunkId[0] = 'R';
+	p_head.chunkId[1] = 'I';
+	p_head.chunkId[2] = 'F';
+	p_head.chunkId[3] = 'F';
+
+	//p_head.format = {'W','A','V','E'};
+	p_head.format[0] = 'W';
+	p_head.format[1] = 'A';
+	p_head.format[2] = 'V';
+	p_head.format[3] = 'E';
+
+	//p_head.subchunk1ID = {'f','m','t',' '};
+	p_head.subchunk1ID[0] = 'f';
+	p_head.subchunk1ID[1] = 'm';
+	p_head.subchunk1ID[2] = 't';
+	p_head.subchunk1ID[3] = ' ';
+
+	p_head.subchunk1Size = 16; // for PCM
+	p_head.audioFormat = 1; //is 1 for PCM
+	p_head.numChannels = channels;
+	p_head.sampleRate = trackFreq;
+	p_head.byteRate = byterate;
+	p_head.blockAlign = 4;//4 bytes of pcm data per sample
+	p_head.bitsPerSample = 16;// 4 bytes of PCM data
+	//p_head.subchunk2ID = {'d','a','t','a'};
+	p_head.subchunk2ID[0] ='d';
+	p_head.subchunk2ID[1] ='a';
+	p_head.subchunk2ID[2] ='t';
+	p_head.subchunk2ID[3] ='a';
+
+	p_head.subchunk2Size = MAX_CHUNK_SIZE;
+	p_head.chunkSize = MAX_CHUNK_SIZE + 36;//subchunk2Size + 36 size of header
+
+	if(dumpPcmFp) {
+		fwrite (&p_head, 1, sizeof(struct pcm_header), dumpPcmFp);
+	}
+
+	return 1;
+#else
+#endif
+}
+
+int pcm_sink_write (void *pcm_buff,int buff_len)
+{
+#ifdef ENABLE_PCM_SINK_DUMP
+	if (buff_len % 2 == 0) {
+		if (dumpPcmFp) {
+			if (bytes_written + buff_len < MAX_CHUNK_SIZE) {
+				bytes_written = bytes_written + fwrite (pcm_buff, 1, buff_len, dumpPcmFp);
+				DBG("bytes written %d",bytes_written);
+			}
+			else if (bytes_written + buff_len == MAX_CHUNK_SIZE) {
+				bytes_written = bytes_written + fwrite (pcm_buff, 1, buff_len, dumpPcmFp);
+				DBG("bytes written %d",bytes_written);
+				pcm_sink_stop();
+				pcm_sink_init(trackFrequency,numberChannels);
+				bytes_written = 0;
+			}
+			else {
+				int space = MAX_CHUNK_SIZE - bytes_written;
+				space = fwrite (pcm_buff, 1, space, dumpPcmFp);
+				DBG("bytes written in last frame %d",space);
+				pcm_sink_stop();
+				pcm_sink_init(trackFrequency,numberChannels);
+				bytes_written = 0;
+				bytes_written = fwrite (pcm_buff + space, 1, (buff_len - space), dumpPcmFp);
+				DBG("bytes written in new frame %d",bytes_written);
+			}
+		}
+	}
+	else {
+		// buff_len will be multiple of 4 for stereo and multiple of 2 for mono
+		error("buff_len should always be even %d",buff_len);
+	}
+#else
+#endif
+	return bytes_written;
+}
+
+void pcm_sink_stop(void)
+{
+#ifdef ENABLE_PCM_SINK_DUMP
+	if (dumpPcmFp) {
+		fclose (dumpPcmFp);
+		DBG("dumpPcmFp file closed ");
+	}
+#else
+#endif
+}
+
+int get_number_channel(int channelType)
+{
+	if(channelType == AUDIO_CHANNEL_OUT_STEREO)
+		return 2;
+	else
+		return 1;
 }
