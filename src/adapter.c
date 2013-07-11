@@ -2145,17 +2145,19 @@ static DBusMessage *remove_device(DBusConnection *conn, DBusMessage *msg,
 		return btd_error_does_not_exist(msg);
 
 	device = l->data;
-
-	if (device_is_temporary(device) || device_is_busy(device)) {
-		DBG("Device is temporary");
-		if (device_is_connected(device)) {
-			DBG("Disconnecting the device");
-			device_request_disconnect(device, msg);
-			return NULL;
-		} else {
-			return g_dbus_create_error(msg,
+	DBG("Device busy:: %d", device_is_busy(device));
+        if (device_get_type(device) != DEVICE_TYPE_LE) {
+		if (device_is_temporary(device) || device_is_busy(device)) {
+			DBG("Device is temporary");
+			if (device_is_connected(device)) {
+				DBG("Disconnecting the device");
+				device_request_disconnect(device, msg);
+				return NULL;
+			} else {
+				return g_dbus_create_error(msg,
 					ERROR_INTERFACE ".DoesNotExist",
 					"Device creation in progress");
+			}
 		}
 	}
 
