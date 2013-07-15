@@ -48,6 +48,7 @@
 #define EIR_NAME_COMPLETE           0x09  /* complete local name */
 #define EIR_TX_POWER                0x0A  /* transmit power level */
 #define EIR_DEVICE_ID               0x10  /* device ID */
+#define EIR_APPERANCE               0x19
 
 typedef struct request {
 	bdaddr_t device;
