@@ -388,6 +388,9 @@ static void primary_attrib_destroy(gpointer user_data)
 	gboolean on_destroy = TRUE;
 
 	DBG("");
+    if (prim == NULL)
+            return;
+
 	DBG("%s", prim->path);
 
 	g_slist_foreach(prim->chars, characteristic_clean, &on_destroy);
