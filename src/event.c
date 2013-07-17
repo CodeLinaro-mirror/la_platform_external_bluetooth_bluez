@@ -64,8 +64,9 @@ struct eir_data {
 	int flags;
 	char *name;
 	gboolean name_complete;
-        uint16_t vid;
-        uint16_t pid;
+	uint16_t vid;
+	uint16_t pid;
+	int appearance;
 };
 
 static gboolean get_adapter_and_device(bdaddr_t *src, bdaddr_t *dst,
@@ -378,6 +379,7 @@ static int parse_eir_data(struct eir_data *eir, uint8_t *eir_data,
 	gboolean is_primary_did_fetched = FALSE;
 
 	eir->flags = -1;
+	eir->appearance = 0;
 
 	/* No EIR data to parse */
 	if (eir_data == NULL || eir_length == 0)
@@ -446,6 +448,10 @@ static int parse_eir_data(struct eir_data *eir, uint8_t *eir_data,
 				is_primary_did_fetched = TRUE;
 			}
 			break;
+        case EIR_APPERANCE:
+            eir->appearance = ((eir_data[3] << 8) | eir_data[2]);
+            DBG("eir->apperance: %x\n", eir->appearance);
+            break;
 		}
 
 		len += field_len + 1;
@@ -560,6 +566,11 @@ static void update_lastused(bdaddr_t *sba, bdaddr_t *dba)
 	write_lastused_info(sba, dba, tm);
 }
 
+#define PERIPHERAL_NON_KEYBOARD_NON_POINTING  0x0500
+#define PERIPHERAL_KEYBOARD                   0x0540
+#define PERIPHERAL_POINTING                   0x0580
+#define PERIPHERAL_KEYBOARD_POINTING          0x05C0
+
 void btd_event_device_found(bdaddr_t *local, bdaddr_t *peer, uint8_t type,
 		uint8_t le, uint32_t class, int8_t rssi, uint8_t *data)
 {
@@ -632,7 +643,32 @@ void btd_event_device_found(bdaddr_t *local, bdaddr_t *peer, uint8_t type,
 				name_status = NAME_SHORT;
 		}
 	}
-
+        if(eir_data.appearance != 0) {
+		int clsValue = 0;
+		switch(eir_data.appearance) {
+		case 960:       // HID generic
+		case 961:       // Keyboard
+			clsValue = PERIPHERAL_KEYBOARD;
+			break;
+                case 962:       // Mouse
+			clsValue = PERIPHERAL_POINTING;
+			break;
+		case 963:       // Joystick
+		case 964:       // Gamepad
+		case 965:       // Digitizer Tablet
+		case 966:       // Card Reader
+		case 967:       // Digital Pen
+		case 968:       // Barcode Scanner
+			clsValue = PERIPHERAL_NON_KEYBOARD_NON_POINTING;
+			break;
+		default:
+			break;
+		}
+		if(clsValue != 0) {
+			write_remote_class(local, peer, clsValue);
+			class = clsValue;
+		}
+	}
 	adapter_update_found_devices(adapter, peer, rssi, class, dev_name,
 					alias, legacy, le, eir_data.flags,
 					eir_data.services, name_status,

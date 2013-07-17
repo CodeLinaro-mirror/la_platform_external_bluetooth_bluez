@@ -4363,6 +4363,7 @@ void adapter_emit_device_found(struct btd_adapter *adapter,
 
 		emit_device_found(adapter->path, paddr,
 				"Address", DBUS_TYPE_STRING, &paddr,
+                "Class", DBUS_TYPE_UINT32, &dev->class,
 				"RSSI", DBUS_TYPE_INT16, &rssi,
 				"Name", DBUS_TYPE_STRING, &dev->name,
 				"Paired", DBUS_TYPE_BOOLEAN, &paired,
@@ -4556,8 +4557,10 @@ void adapter_update_found_devices(struct btd_adapter *adapter, bdaddr_t *bdaddr,
 		dev->le = 0;
 		dev->class = class;
 		dev->rssi = rssi;
-	} else if (dev->le)
+	} else if (dev->le) {
 		dev->rssi = rssi;
+                dev->class = class;
+        }
 	else
 		return;
 
