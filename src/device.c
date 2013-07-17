@@ -920,6 +920,8 @@ static DBusMessage *add_to_white_list(DBusConnection *conn, DBusMessage *msg,
 
 	DBG("");
 
+    usleep(1000*100); // delay to register callbacks from jni
+
 	btd_adapter_le_add_dev_white_list(device->adapter, &device->bdaddr, 0);
 
 	reply = dbus_message_new_method_return(msg);
@@ -3005,17 +3007,17 @@ void device_bonding_complete(struct btd_device *device, uint8_t status)
 			device->discov_timer = 0;
 		}
 
-		if (device_get_type(device) == DEVICE_TYPE_LE)
-			device_browse_primary(device, bonding->conn,
-						bonding->msg, FALSE);
-		else
+		/*	device_browse_primary(device, bonding->conn,
+						bonding->msg, FALSE);*/
+		if (device_get_type(device) != DEVICE_TYPE_LE)
 			device_browse_sdp(device, bonding->conn, bonding->msg,
 								NULL, FALSE);
 
 		bonding_request_free(bonding);
 	} else {
 		if (!device->browse && !device->discov_timer &&
-				main_opts.reverse_sdp) {
+			device_get_type(device) != DEVICE_TYPE_LE &&
+                         main_opts.reverse_sdp) {
 			/* If we are not initiators and there is no currently
 			 * active discovery or discovery timer, set discovery
 			 * timer */
