@@ -51,7 +51,7 @@
 
 /* number of periods in pcm buffer (one period corresponds to buffer size reported to audio flinger
  * by out_get_buffer_size() */
-#define BUF_NUM_PERIODS 6
+#define BUF_NUM_PERIODS 24
 /* maximum time allowed by out_standby_stream_locked() for 2dp_write() to complete */
 #define BUF_WRITE_COMPLETION_TIMEOUT_MS 5000
 /* maximum time allowed by out_write() for frames to be available in in write thread buffer */
@@ -658,7 +658,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->stream.get_render_position = out_get_render_position;
 
     out->sample_rate = 48000;
-    out->buffer_size = 512 * 32;
+    out->buffer_size = 512 * 8;
     out->channels = AUDIO_CHANNEL_OUT_STEREO;
     out->format = AUDIO_FORMAT_PCM_16_BIT;
 
