@@ -4691,6 +4691,8 @@ void adapter_remove_connection(struct btd_adapter *adapter,
 						struct btd_device *device,
 						uint8_t reason)
 {
+	char addr[18];
+	bdaddr_t	bdaddr;
 	DBG("");
 
 	if (!g_slist_find(adapter->connections, device)) {
@@ -4710,6 +4712,15 @@ void adapter_remove_connection(struct btd_adapter *adapter,
 
 		DBG("Removing temporary device %s", path);
 		adapter_remove_device(connection, adapter, device, TRUE);
+	} else {
+		device_get_address(device, &bdaddr);
+		ba2str(&bdaddr, addr);
+		if (!device_is_paired(device) &&
+			device_is_hid_mouse(adapter, addr)) {
+			DBG("HID device is not paired, removing the device");
+			temp_records_clean_up(device, adapter, addr);
+			adapter_remove_device(connection, adapter, device, TRUE);
+		}
 	}
 }
 
