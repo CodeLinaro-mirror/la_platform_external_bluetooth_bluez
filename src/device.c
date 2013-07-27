@@ -3005,19 +3005,18 @@ void device_bonding_complete(struct btd_device *device, uint8_t status)
 		if (device->discov_timer) {
 			g_source_remove(device->discov_timer);
 			device->discov_timer = 0;
-		}
-
-		/*	device_browse_primary(device, bonding->conn,
-						bonding->msg, FALSE);*/
-		if (device_get_type(device) != DEVICE_TYPE_LE)
+                }
+                if (device_get_type(device) == DEVICE_TYPE_LE)
+			device_browse_primary(device, bonding->conn,
+				bonding->msg, FALSE);
+		else
 			device_browse_sdp(device, bonding->conn, bonding->msg,
-								NULL, FALSE);
-
+					NULL, FALSE);
 		bonding_request_free(bonding);
 	} else {
 		if (!device->browse && !device->discov_timer &&
 			device_get_type(device) != DEVICE_TYPE_LE &&
-                         main_opts.reverse_sdp) {
+                        main_opts.reverse_sdp) {
 			/* If we are not initiators and there is no currently
 			 * active discovery or discovery timer, set discovery
 			 * timer */
