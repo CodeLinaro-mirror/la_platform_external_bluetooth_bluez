@@ -126,6 +126,8 @@ struct astream_out {
     pthread_cond_t write_cond;  /* condition associated with write_busy flag */
 };
 
+static uint32_t max_latency = 0;
+
 static uint64_t system_time(void)
 {
     struct timespec t;
@@ -181,11 +183,23 @@ static int out_dump(const struct audio_stream *stream, int fd)
     return 0;
 }
 
+size_t _out_frames_ready_locked(struct astream_out *out);
+
 static uint32_t out_get_latency(const struct audio_stream_out *stream)
 {
     const struct astream_out *out = (const struct astream_out *)stream;
 
-    return ((out->buffer_duration_us * BUF_NUM_PERIODS) / 1000) + 200;
+    uint32_t latency = 0;
+    size_t frames = _out_frames_ready_locked(out);
+
+    ALOGV("frames : BT : %d", frames);
+    latency = (frames * 1000)/48000 + 200;
+    if (latency > max_latency) {
+        max_latency = latency;
+    }
+
+    ALOGV("max_latency and latency : BT : %d %d", max_latency, latency);
+    return max_latency;
 }
 
 static int out_set_volume(struct audio_stream_out *stream, float left,
@@ -253,6 +267,7 @@ static int out_standby_stream_locked(struct astream_out *out)
 
     ALOGV_IF(!out->bt_enabled, "Standby skip stop: enabled %d", out->bt_enabled);
     if (out->bt_enabled) {
+        max_latency = 0;
         ret = a2dp_stop(out->data);
     }
     release_wake_lock(A2DP_WAKE_LOCK_NAME);
