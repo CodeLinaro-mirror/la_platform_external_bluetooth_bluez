@@ -4,6 +4,7 @@
  *
  *  Copyright (C) 2006-2010  Nokia Corporation
  *  Copyright (C) 2004-2010  Marcel Holtmann <marcel@holtmann.org>
+ *  Copyright (C) 2013, The Linux Foundation. All rights reserved
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -113,6 +114,7 @@ void device_update_rssi(struct btd_device *device, int8_t rssi);
 void device_update_le_conn_params(struct btd_device *device, uint16_t interval,
 					uint16_t latency, uint16_t timeout);
 void device_request_disconnect(struct btd_device *device, DBusMessage *msg);
+void device_update_battery_level(struct btd_device *device, uint8_t level);
 
 typedef void (*disconnect_watch) (struct btd_device *device, gboolean removal,
 					void *user_data);

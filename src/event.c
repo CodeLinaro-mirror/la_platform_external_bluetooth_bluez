@@ -958,3 +958,15 @@ void btd_event_returned_link_key(bdaddr_t *local, bdaddr_t *peer)
 
 	device_set_paired(device, TRUE);
 }
+
+void btd_event_battery_level(bdaddr_t *local, bdaddr_t *peer,
+				uint8_t battery_level)
+{
+	struct btd_adapter *adapter;
+	struct btd_device *device;
+
+	if (!get_adapter_and_device(local, peer, &adapter, &device, TRUE))
+		return;
+
+	device_update_battery_level(device, battery_level);
+}
