@@ -86,6 +86,7 @@ include $(CLEAR_VARS)
 LOCAL_SHARED_LIBRARIES := \
 	libbluetoothd
 
+LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE:=bluetoothd
 
 include $(BUILD_EXECUTABLE)
