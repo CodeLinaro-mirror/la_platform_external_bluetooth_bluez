@@ -236,11 +236,13 @@ static void device_free(gpointer user_data)
 	struct btd_device *device = user_data;
 	struct btd_adapter *adapter = device->adapter;
 	struct agent *agent = adapter_get_agent(adapter);
+	struct authentication_req *auth = device->authr;
 
-	if (device->agent)
+	if (auth && device->agent && !bacmp(&auth->device->bdaddr, &device->bdaddr))
 		agent_free(device->agent);
 
-	if (agent && (agent_is_busy(agent, device) ||
+	if (agent && auth && !bacmp(&auth->device->bdaddr, &device->bdaddr) &&
+		(agent_is_busy(agent, device) ||
 				agent_is_busy(agent, device->authr)))
 		agent_cancel(agent);
 
@@ -3333,10 +3335,10 @@ void device_cancel_authentication(struct btd_device *device, gboolean aborted)
 	ba2str(&device->bdaddr, addr);
 	DBG("Canceling authentication request for %s", addr);
 
-	if (auth->agent)
+	if (auth->agent && !bacmp(&auth->device->bdaddr, &device->bdaddr))
 		agent_cancel(auth->agent);
 
-	if (!aborted)
+	if (!aborted && !bacmp(&auth->device->bdaddr, &device->bdaddr))
 		cancel_authentication(auth);
 
 	close_sdp_channel(device);
