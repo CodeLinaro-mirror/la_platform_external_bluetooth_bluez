@@ -850,6 +850,19 @@ static DBusMessage *cancel_discover(DBusConnection *conn,
 	return dbus_message_new_method_return(msg);
 }
 
+static DBusMessage *cancel_auth(DBusConnection *conn,
+					DBusMessage *msg, void *user_data)
+{
+	struct btd_device *device = user_data;
+	const char *sender = dbus_message_get_sender(msg);
+
+	DBG("cancel_auth");
+	device_cancel_authentication(device, TRUE);
+	do_disconnect(device);
+
+	return dbus_message_new_method_return(msg);
+}
+
 static void bonding_request_cancel(struct bonding_req *bonding)
 {
 	struct btd_device *device = bonding->device;
@@ -1184,6 +1197,7 @@ static GDBusMethodTable device_methods[] = {
 	{ "DiscoverServices",	"s",	"a{us}",	discover_services,
 						G_DBUS_METHOD_FLAG_ASYNC},
 	{ "CancelDiscovery",	"",	"",		cancel_discover	},
+	{ "CancelAuth",	"", "", 	cancel_auth },
 	{ "Disconnect",		"",	"",		disconnect,
 						G_DBUS_METHOD_FLAG_ASYNC},
 	{ "GetServiceAttributeValue",  "sq", "i",       get_service_attribute_value},
@@ -3106,6 +3120,9 @@ static void pincode_cb(struct agent *agent, DBusError *err,
 	device->authr->cb = NULL;
 	device->authr->agent = NULL;
 
+	if (err)
+		device_cancel_authentication(device, TRUE);
+
 	if (NULL == pincode) {
 		device_remove_stored(device);
 		if (device->tmp_records) {
@@ -3129,6 +3146,9 @@ static void confirm_cb(struct agent *agent, DBusError *err, void *data)
 
 	device->authr->cb = NULL;
 	device->authr->agent = NULL;
+
+	if (err)
+		device_cancel_authentication(device, TRUE);
 }
 
 static void oob_data_cb(struct agent *agent, DBusError *err,
@@ -3145,6 +3165,9 @@ static void oob_data_cb(struct agent *agent, DBusError *err,
 
 	device->authr->cb = NULL;
 	device->authr->agent = NULL;
+
+	if (err)
+		device_cancel_authentication(device, TRUE);
 }
 
 static void passkey_cb(struct agent *agent, DBusError *err,
@@ -3163,6 +3186,9 @@ static void passkey_cb(struct agent *agent, DBusError *err,
 
 	device->authr->cb = NULL;
 	device->authr->agent = NULL;
+
+	if (err)
+		device_cancel_authentication(device, TRUE);
 }
 
 static void pairing_consent_cb(struct agent *agent, DBusError *err, void *data)
@@ -3177,6 +3203,9 @@ static void pairing_consent_cb(struct agent *agent, DBusError *err, void *data)
 	((agent_cb) auth->cb)(agent, err, device);
 
 	auth->cb = NULL;
+
+	if (err)
+		device_cancel_authentication(device, TRUE);
 }
 
 int device_request_oob_availability(struct btd_device *device,
