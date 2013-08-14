@@ -4,6 +4,7 @@
  *
  *  Copyright (C) 2006-2010  Nokia Corporation
  *  Copyright (C) 2004-2010  Marcel Holtmann <marcel@holtmann.org>
+ *  Copyright (C) 2013, The Linux Foundation. All rights reserved
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -51,3 +52,5 @@ int btd_event_link_key_notify(bdaddr_t *local, bdaddr_t *peer,
 				uint8_t pin_length, uint8_t auth,
 				uint8_t dlen, uint8_t *data);
 int hcid_dbus_get_oob_data(bdaddr_t *sba, bdaddr_t *dba);
+void btd_event_battery_level(bdaddr_t *local, bdaddr_t *peer,
+				uint8_t battery_level);

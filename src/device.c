@@ -2818,6 +2818,21 @@ void device_set_paired(struct btd_device *device, gboolean value)
 				DBUS_TYPE_BOOLEAN, &value);
 }
 
+void device_update_battery_level(struct btd_device *device, uint8_t level)
+{
+	DBusConnection *conn = get_dbus_connection();
+
+	if (!device)
+		return;
+
+	if (!device->connected)
+		return;
+
+	DBG("New battery level is %d", level);
+	emit_property_changed(conn, device->path, DEVICE_INTERFACE, "BatteryLevel",
+				DBUS_TYPE_BYTE, &level);
+}
+
 static void device_agent_removed(struct agent *agent, void *user_data)
 {
 	struct btd_device *device = user_data;

@@ -1750,6 +1750,28 @@ static void mgmt_le_conn_params(int sk, uint16_t index, void *buf, size_t len)
 				ev->interval, ev->latency, ev->timeout);
 }
 
+static void mgmt_remote_battery_level(int sk, uint16_t index, void *buf, size_t len)
+{
+	struct mgmt_ev_remote_battery_level *ev = buf;
+	struct controller_info *info;
+
+	if (len < sizeof(*ev)) {
+		error("Too small mgmt_le_conn_params packet");
+		return;
+	}
+
+	if (index > max_index) {
+		error("Unexpected index %u in le_conn_params event", index);
+		return;
+	}
+
+	info = &controllers[index];
+
+	DBG("battery level: %d", ev->battery_level);
+	btd_event_battery_level(&info->bdaddr, &ev->bdaddr,
+				ev->battery_level);
+}
+
 static gboolean mgmt_event(GIOChannel *io, GIOCondition cond, gpointer user_data)
 {
 	char buf[MGMT_BUF_SIZE];
@@ -1876,6 +1898,9 @@ static gboolean mgmt_event(GIOChannel *io, GIOCondition cond, gpointer user_data
 		break;
 	case MGMT_EV_LE_CONN_PARAMS:
 		mgmt_le_conn_params(sk, index, buf + MGMT_HDR_SIZE, len);
+		break;
+	case MGMT_EV_REMOTE_BATTERY_LEVEL:
+		mgmt_remote_battery_level(sk, index, buf + MGMT_HDR_SIZE, len);
 		break;
 	default:
 		error("Unknown Management opcode %u (index %u)", opcode, index);
