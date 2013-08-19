@@ -286,7 +286,7 @@ static void simple_agent_reply(DBusPendingCall *call, void *user_data)
 		}
 
 		dbus_error_free(&err);
-		goto done;
+		goto unref;
 	}
 
 	dbus_error_init(&err);
@@ -294,15 +294,16 @@ static void simple_agent_reply(DBusPendingCall *call, void *user_data)
 		error("Wrong reply signature: %s", err.message);
 		cb(agent, &err, req->user_data);
 		dbus_error_free(&err);
-		goto done;
+		goto unref;
 	}
 
 	cb(agent, NULL, req->user_data);
 done:
+	agent_request_free(req, TRUE);
+unref:
 	dbus_message_unref(message);
 
 	agent->request = NULL;
-	agent_request_free(req, TRUE);
 }
 
 static int agent_call_authorize(struct agent_request *req,
@@ -449,7 +450,7 @@ static void pincode_reply(DBusPendingCall *call, void *user_data)
 
 		cb(agent, &err, NULL, req->user_data);
 		dbus_error_free(&err);
-		goto done;
+		goto unref;
 	}
 
 	dbus_error_init(&err);
@@ -459,7 +460,7 @@ static void pincode_reply(DBusPendingCall *call, void *user_data)
 		error("Wrong passkey reply signature: %s", err.message);
 		cb(agent, &err, NULL, req->user_data);
 		dbus_error_free(&err);
-		goto done;
+		goto unref;
 	}
 
 	len = strlen(pin);
@@ -471,18 +472,19 @@ static void pincode_reply(DBusPendingCall *call, void *user_data)
 					"Invalid passkey length");
 		cb(agent, &err, NULL, req->user_data);
 		dbus_error_free(&err);
-		goto done;
+		goto unref;
 	}
 
 	cb(agent, NULL, pin, req->user_data);
 
 done:
+	agent_request_free(req, TRUE);
+unref:
 	if (message)
 		dbus_message_unref(message);
 
 	dbus_pending_call_cancel(req->call);
 	agent->request = NULL;
-	agent_request_free(req, TRUE);
 }
 
 static int pincode_request_new(struct agent_request *req, const char *device_path,
@@ -625,7 +627,7 @@ static void passkey_reply(DBusPendingCall *call, void *user_data)
 				err.name, err.message);
 		cb(agent, &err, 0, req->user_data);
 		dbus_error_free(&err);
-		goto done;
+		goto unref;
 	}
 
 	dbus_error_init(&err);
@@ -635,18 +637,19 @@ static void passkey_reply(DBusPendingCall *call, void *user_data)
 		error("Wrong passkey reply signature: %s", err.message);
 		cb(agent, &err, 0, req->user_data);
 		dbus_error_free(&err);
-		goto done;
+		goto unref;
 	}
 
 	cb(agent, NULL, passkey, req->user_data);
 
 done:
+	agent_request_free(req, TRUE);
+unref:
 	if (message)
 		dbus_message_unref(message);
 
 	dbus_pending_call_cancel(req->call);
 	agent->request = NULL;
-	agent_request_free(req, TRUE);
 }
 
 static int passkey_request_new(struct agent_request *req,
@@ -731,7 +734,7 @@ static void oob_data_reply(DBusPendingCall *call, void *user_data)
 				err.name, err.message);
 		cb(agent, &err, 0, 0, req->user_data);
 		dbus_error_free(&err);
-		goto done;
+		goto unref;
 	}
 
 	if (!dbus_message_get_args(message, &err,
@@ -741,18 +744,19 @@ static void oob_data_reply(DBusPendingCall *call, void *user_data)
 		error("Wrong OOB data reply signature: %s", err.message);
 		cb(agent, &err, 0, 0, req->user_data);
 		dbus_error_free(&err);
-		goto done;
+		goto unref;
 	}
 
 	cb(agent, NULL, hash_ptr, r_ptr, req->user_data);
 
 done:
+	agent_request_free(req, TRUE);
+unref:
 	if (message)
 		dbus_message_unref(message);
 
 	dbus_pending_call_cancel(req->call);
 	agent->request = NULL;
-	agent_request_free(req, TRUE);
 }
 
 static int oob_data_request_new(struct agent_request *req,
