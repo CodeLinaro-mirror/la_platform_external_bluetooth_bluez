@@ -190,6 +190,8 @@ static DBusConnection *connection = NULL;
 static gchar *input_device_name = NULL;
 static GSList *servers = NULL;
 
+static gboolean ignore_send_playstatus = FALSE;
+static uint8_t prev_play_status = STATUS_STOPPED;
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 
 struct avctp_header {
@@ -537,6 +539,15 @@ static gboolean handle_key_op (struct control *control,
 
 		DBG("AVRCP: %s %d", key_map[i].name, pressed);
 
+		if (key_map[i].avrcp == REWIND_OP || key_map[i].avrcp == FAST_FORWARD_OP ){
+			if (pressed ){
+				DBG("ignore_send_playstatus ON");
+				ignore_send_playstatus = TRUE;
+			} else {
+				DBG("ignore_send_playstatus OFF");
+				ignore_send_playstatus = FALSE;
+			}
+		}
 		key_quirks = control->key_quirks[key_map[i].avrcp];
 
 		if (key_quirks & QUIRK_NO_RELEASE) {
@@ -896,7 +907,15 @@ static gboolean control_cb(GIOChannel *chan, GIOCondition cond,
 				params->param_len = htons(0x2);
 				operands = (unsigned char *)params;
 				operands += AVRCP_PKT_PARAMS_LEN;
-				*operands = mdata->current_play_status;
+				/*current_play_status will be moved to playing state from
+				App Layer when FF/REV operation is ongoing. Added check to
+				make sure the PLAYING status is not sent in interim response
+				when FF/REV operation is ongoing.*/
+				if (ignore_send_playstatus == TRUE) {
+					*operands = prev_play_status;
+				} else {
+					*operands = mdata->current_play_status;
+				}
 				packet_size -= 3;
 			} else if (params->capability_id == EVENT_PLAYBACK_POS_CHANGED) {
 				uint32_t *wordoperand;
@@ -1410,6 +1429,8 @@ gboolean avrcp_connect(struct audio_device *dev)
 	GError *err = NULL;
 	GIOChannel *io;
 
+	ignore_send_playstatus = FALSE;
+	prev_play_status = STATUS_STOPPED;
 	if (control->state > AVCTP_STATE_DISCONNECTED)
 		return TRUE;
 
@@ -2885,6 +2906,22 @@ static int send_notification(struct control *control,
 
 			if (mdata->reg_playback_status == FALSE)
 				return 0;
+
+			DBG("Previous play_status %d ", prev_play_status);
+			DBG("Current play_status %d", mdata->current_play_status);
+			if (ignore_send_playstatus == TRUE){
+				if (prev_play_status == mdata->current_play_status){
+					DBG("No change pre send_playback_status canceled");
+					return 0;
+				}
+				if (mdata->current_play_status == STATUS_PLAYING){
+					DBG("FF/RW in progress ignore sendPlaybackStatus");
+					return 0;
+				}
+			}
+			prev_play_status = mdata->current_play_status;
+			DBG("Pre play_status changed %d", prev_play_status);
+
 			*op = event_data;
 			avctp->transaction = mdata->trans_id_event_playback;
 			mdata->reg_playback_status = FALSE;
