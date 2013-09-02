@@ -692,23 +692,15 @@ void btd_event_remote_name(bdaddr_t *local, bdaddr_t *peer, uint8_t status,
 	struct btd_adapter *adapter;
 	char srcaddr[18], dstaddr[18];
 	struct btd_device *device;
+        const char *invalid;
 	struct remote_dev_info match, *dev_info;
 
 	DBG("");
 	if (status == 0) {
-		if (!g_utf8_validate(name, -1, NULL)) {
-			int i;
+		if (!g_utf8_validate(name, -1, &invalid))
+                        name[invalid-name] ='\0';
 
-			/* Assume ASCII, and replace all non-ASCII with
-			 * spaces */
-			for (i = 0; name[i] != '\0'; i++) {
-				if (!isascii(name[i]))
-					name[i] = ' ';
-			}
-			/* Remove leading and trailing whitespace characters */
-			g_strstrip(name);
-		}
-
+                DBG("Name: %s", name);
 		write_device_name(local, peer, name);
 	}
 
