@@ -351,6 +351,14 @@ static void events_handler(const uint8_t *pdu, uint16_t len,
 
 	handle = att_get_u16(&pdu[1]);
 
+#ifdef BLE_HOGP_CERT
+	// we always need to reply with confirm for any indication, even though
+	// there is no valid characteristic for this handle
+	olen = enc_confirmation(opdu, sizeof(opdu));
+	g_attrib_send(device_get_attrib(gatt->dev), 0, opdu[0], opdu, olen,
+						NULL, NULL, NULL);
+#endif
+
 	for (lprim = gatt->primary, prim = NULL, chr = NULL; lprim;
 						lprim = lprim->next) {
 		prim = lprim->data;
@@ -370,9 +378,11 @@ static void events_handler(const uint8_t *pdu, uint16_t len,
 
 	switch (pdu[0]) {
 	case ATT_OP_HANDLE_IND:
-		olen = enc_confirmation(opdu, sizeof(opdu));
-		g_attrib_send(device_get_attrib(gatt->dev), 0, opdu[0], opdu, olen,
-						NULL, NULL, NULL);
+#ifndef BLE_HOGP_CERT
+                olen = enc_confirmation(opdu, sizeof(opdu));
+                g_attrib_send(device_get_attrib(gatt->dev), 0, opdu[0], opdu, olen,
+                                               NULL, NULL, NULL);
+#endif
 	case ATT_OP_HANDLE_NOTIFY:
 		if (characteristic_set_value(chr, &pdu[3], len - 3) < 0)
 			DBG("Can't change Characteristic 0x%02x", handle);

@@ -16,6 +16,11 @@ LOCAL_CFLAGS:= \
 	-DCONFIGDIR=\"/etc/bluetooth\" \
 	-DANDROID \
 
+ifeq ($(BTLE_HOGP_QCOM_CERT),true)
+LOCAL_CFLAGS += \
+       -DBLE_HOGP_CERT
+endif
+
 LOCAL_C_INCLUDES:= \
 	$(LOCAL_PATH)/../lib \
 	$(LOCAL_PATH)/../gdbus \
