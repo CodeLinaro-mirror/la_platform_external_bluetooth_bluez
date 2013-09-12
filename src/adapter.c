@@ -3233,6 +3233,12 @@ static void create_stored_device_from_profiles(char *key, char *value,
 	if (!device)
 		return;
 
+	if (device_is_hid_mouse(adapter, key)) {
+		device_set_paired(device, TRUE);
+		device_set_bonded(device, TRUE);
+		DBG("%s", "HID mouse set as paired");
+	}
+
 	device_set_temporary(device, FALSE);
 	adapter->devices = g_slist_append(adapter->devices, device);
 
