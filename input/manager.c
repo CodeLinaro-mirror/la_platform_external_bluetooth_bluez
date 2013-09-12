@@ -161,6 +161,15 @@ static void hid_server_remove(struct btd_adapter *adapter)
 	btd_adapter_unref(adapter);
 }
 
+static void hid_adapter_enabled(struct btd_adapter *adapter)
+{
+	bdaddr_t src;
+
+	adapter_get_address(adapter, &src);
+
+	server_adapter_enabled(&src);
+}
+
 static struct btd_device_driver input_hid_driver = {
 	.name	= "input-hid",
 	.uuids	= BTD_UUIDS(HID_UUID),
@@ -179,6 +188,7 @@ static struct btd_adapter_driver input_server_driver = {
 	.name   = "input-server",
 	.probe  = hid_server_probe,
 	.remove = hid_server_remove,
+	.adapter_enabled = hid_adapter_enabled,
 };
 
 int input_manager_init(DBusConnection *conn, GKeyFile *config)

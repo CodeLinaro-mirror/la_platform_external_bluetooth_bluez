@@ -169,6 +169,7 @@ struct btd_adapter_driver {
 	const char *name;
 	int (*probe) (struct btd_adapter *adapter);
 	void (*remove) (struct btd_adapter *adapter);
+	void (*adapter_enabled) (struct btd_adapter *adapter);
 };
 
 typedef void (*service_auth_cb) (DBusError *derr, void *user_data);
@@ -260,6 +261,7 @@ struct btd_adapter_ops {
 int btd_register_adapter_ops(struct btd_adapter_ops *ops, gboolean priority);
 void btd_adapter_cleanup_ops(struct btd_adapter_ops *btd_adapter_ops);
 int adapter_ops_setup(void);
+void btd_adapter_enabled(struct btd_adapter *adapter);
 
 typedef void (*btd_adapter_powered_cb) (struct btd_adapter *adapter,
 						gboolean powered);

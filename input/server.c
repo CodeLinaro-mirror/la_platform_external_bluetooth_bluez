@@ -48,6 +48,7 @@ struct input_server {
 	GIOChannel *ctrl;
 	GIOChannel *intr;
 	GIOChannel *confirm;
+	gboolean adapter_enabled;
 };
 
 static gint server_cmp(gconstpointer s, gconstpointer user_data)
@@ -156,6 +157,11 @@ static void confirm_event_cb(GIOChannel *chan, gpointer user_data)
 		goto drop;
 	}
 
+	if (!server->adapter_enabled) {
+		error("Adapter is still not enabled, refusing incoming connection");
+		goto drop;
+	}
+
 	if (server->confirm) {
 		error("Refusing connection: setup in progress");
 		goto drop;
@@ -237,4 +243,17 @@ void server_stop(const bdaddr_t *src)
 
 	servers = g_slist_remove(servers, server);
 	g_free(server);
+}
+
+void server_adapter_enabled(const bdaddr_t *src)
+{
+	struct input_server *server;
+	GSList *l;
+
+	l = g_slist_find_custom(servers, src, server_cmp);
+	if (!l)
+		return;
+
+	server = l->data;
+	server->adapter_enabled = TRUE;
 }

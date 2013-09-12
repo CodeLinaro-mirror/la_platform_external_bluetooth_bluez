@@ -3635,6 +3635,22 @@ static void probe_driver(struct btd_adapter *adapter, gpointer user_data)
 									driver);
 }
 
+static void enable_driver(struct btd_adapter *adapter, gpointer user_data)
+{
+	struct btd_adapter_driver *driver = user_data;
+
+	if (driver->adapter_enabled)
+		driver->adapter_enabled(adapter);
+}
+
+void btd_adapter_enabled(struct btd_adapter *adapter)
+{
+	GSList *l;
+
+	for (l = adapter_drivers; l; l = l->next)
+		enable_driver(adapter, l->data);
+}
+
 static void load_drivers(struct btd_adapter *adapter)
 {
 	GSList *l;
