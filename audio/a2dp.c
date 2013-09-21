@@ -1193,6 +1193,10 @@ static void close_cfm(struct avdtp *session, struct avdtp_local_sep *sep,
 
 	a2dp_sep->remote_suspend = FALSE;
 
+	if (a2dp_sep->reconfig_timer_index) {
+		return;
+	}
+
 	if (err) {
 		setup->stream = NULL;
 		setup->err = err;
