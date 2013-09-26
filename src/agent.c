@@ -1010,7 +1010,7 @@ gboolean agent_matches(struct agent *agent, const char *name, const char *path)
 
 gboolean agent_is_busy(struct agent *agent, void *user_data)
 {
-	if (!agent->request)
+	if (!agent->request || !user_data)
 		return FALSE;
 
 	if (user_data && user_data != agent->request->user_data)
