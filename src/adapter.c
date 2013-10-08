@@ -2776,7 +2776,7 @@ static int add_pbap_pse_record(struct btd_adapter *adapter)
 	sdp_set_service_classes(record, svclass_id);
 
 	sdp_uuid16_create(&profile[0].uuid, PBAP_PROFILE_ID);
-	profile[0].version = 0x0100;
+	profile[0].version = 0x0101;
 	pfseq = sdp_list_append(0, profile);
 	sdp_set_profile_descs(record, pfseq);
 
