@@ -1796,6 +1796,10 @@ void attrib_client_unregister(struct btd_device *device)
 
 	for (lp = gatt->primary; lp; lp = lp->next) {
 		struct primary *prim = lp->data;
+                // removing timeout if unregister client.
+                if (prim->discovery_timer > 0)
+                    g_source_remove(prim->discovery_timer);
+                prim->discovery_timer = 0;
 		for (lc = prim->chars; lc; lc = lc->next) {
 			struct characteristic *chr = lc->data;
 			g_dbus_unregister_interface(gatt->conn, chr->path,
