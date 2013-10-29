@@ -162,9 +162,9 @@ static void gatt_service_free(void *user_data)
 {
 	struct gatt_service *gatt = user_data;
 
+	g_attrib_unref(device_get_attrib(gatt->dev));
 	g_slist_foreach(gatt->primary, (GFunc) primary_free, NULL);
 	g_slist_free(gatt->primary);
-	g_attrib_unref(device_get_attrib(gatt->dev));
 	g_free(gatt->path);
 	device_set_gatt(gatt->dev, NULL);
 	btd_device_unref(gatt->dev);
