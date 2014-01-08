@@ -208,7 +208,10 @@ struct agent *agent_create(struct btd_adapter *adapter, const char *name,
 	agent->oob = oob;
 	agent->remove_cb = cb;
 	agent->remove_cb_data = remove_cb_data;
-
+	if (!connection) {
+            error("DBUS might stopped running, connection lost with DBUS");
+            return -EIO;
+       }
 	agent->listener_id = g_dbus_add_disconnect_watch(connection, name,
 							agent_exited, agent,
 							NULL);
@@ -1029,7 +1032,8 @@ void agent_exit(void)
 	connection = NULL;
 }
 
-void agent_init(void)
+DBusConnection *agent_init(void)
 {
 	connection = dbus_bus_get(DBUS_BUS_SYSTEM, NULL);
+	return connection;
 }
