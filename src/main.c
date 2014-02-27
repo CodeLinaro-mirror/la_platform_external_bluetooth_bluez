@@ -383,6 +383,7 @@ int main(int argc, char *argv[])
 	GOptionContext *context;
 	GError *err = NULL;
 	struct sigaction sa;
+	DBusConnection *conn;
 	uint16_t mtu = 0;
 	GKeyFile *config;
 #ifdef ANDROID
@@ -471,8 +472,11 @@ int main(int argc, char *argv[])
 
 	parse_config(config);
 
-	agent_init();
-
+	conn = agent_init();
+	if (!conn) {
+		error(stderr, "Unable to get on D-Bus \n");
+		exit(1);
+	}
 	if (option_udev == FALSE) {
 		if (connect_dbus() < 0) {
 			error("Unable to get on D-Bus");
