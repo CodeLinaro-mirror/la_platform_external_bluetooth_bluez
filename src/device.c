@@ -327,7 +327,6 @@ static DBusMessage *get_properties(DBusConnection *conn,
 
 	DBG("%s", dstaddr);
 
-	btd_adapter_enabled(device->adapter);
 	reply = dbus_message_new_method_return(msg);
 	if (!reply)
 		return NULL;
