@@ -3814,6 +3814,7 @@ void btd_adapter_start(struct btd_adapter *adapter)
 	call_adapter_powered_callbacks(adapter, TRUE);
 
 	adapter_ops->disable_cod_cache(adapter->dev_id);
+	btd_adapter_enabled(adapter);
 
 	info("Adapter %s has been enabled", adapter->path);
 }
