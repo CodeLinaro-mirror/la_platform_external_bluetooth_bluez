@@ -883,6 +883,7 @@ void btd_event_conn_complete(bdaddr_t *local, bdaddr_t *peer, uint8_t le)
 	struct btd_adapter *adapter;
 	struct btd_device *device;
 	char peer_addr[18];
+	device_type_t type;
 	DBusConnection *conn = get_dbus_connection();
 
 	adapter = manager_find_adapter(local);
@@ -897,7 +898,11 @@ void btd_event_conn_complete(bdaddr_t *local, bdaddr_t *peer, uint8_t le)
 
 	if (!device) {
 		DBG("Create new device");
-		device = adapter_create_le_device(conn, adapter, peer_addr);
+		if (le)
+			type = DEVICE_TYPE_LE;
+		else
+			type = DEVICE_TYPE_BREDR;
+		device = adapter_create_device(conn, adapter, peer_addr, type);
 		if (!device) {
 			DBG("Unable to create device");
 			return;
