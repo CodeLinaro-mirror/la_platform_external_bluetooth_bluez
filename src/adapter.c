@@ -1270,7 +1270,7 @@ gboolean device_is_hid_mouse(struct btd_adapter *adapter, const char *address)
 	return 0;
 }
 
-static struct btd_device *adapter_create_device(DBusConnection *conn,
+struct btd_device *adapter_create_device(DBusConnection *conn,
 						struct btd_adapter *adapter,
 						const char *address,
 						device_type_t type)
