@@ -34,6 +34,13 @@
 #define HCI_EVENT_PKT           0x04
 #define HCI_VENDOR_PKT        0xff
 #define cmd_opcode_pack(ogf, ocf) (unsigned short)((ocf & 0x03ff)|(ogf << 10))
+
+#define NVITEM              0
+#define RDWR_PROT           1
+#define NVITEM_SIZE         2
+#define PERSIST_HEADER_LEN  3
+#define BD_ADDR_LEN         6
+
 unsigned char vnd_local_bd_addr[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 typedef enum {
     USERIAL_OP_FLOW_ON,
