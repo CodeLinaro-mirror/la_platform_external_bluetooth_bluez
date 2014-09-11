@@ -851,8 +851,8 @@ int rome_get_tlv_file(char *file_path)
         fprintf(stderr, "Length\t\t\t : %d bytes\n", (ptlv_header->tlv_length1) |
                                                     (ptlv_header->tlv_length2 << 8) |
                                                     (ptlv_header->tlv_length3 << 16));
-        fprintf(stderr, "Total Length\t\t\t : %d bytes\n", ptlv_header->tlv_data_len);
-        fprintf(stderr, "Patch Data Length\t\t\t : %d bytes\n",ptlv_header->tlv_patch_data_len);
+        fprintf(stderr, "Total Length\t\t\t : %d bytes\n", ptlv_header->tlv.patch.tlv_data_len);
+        fprintf(stderr, "Patch Data Length\t\t\t : %d bytes\n",ptlv_header->tlv.patch.tlv_patch_data_len);
         fprintf(stderr, "Signing Format Version\t : 0x%x\n", ptlv_header->tlv.patch.sign_ver);
         fprintf(stderr, "Signature Algorithm\t\t : 0x%x\n", ptlv_header->tlv.patch.sign_algorithm);
         fprintf(stderr, "Reserved\t\t\t : 0x%x\n", ptlv_header->tlv.patch.reserved1);
