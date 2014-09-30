@@ -179,6 +179,9 @@ typedef struct
 #define TAG_NUM_2                       2
 #define TAG_BDADDR_OFFSET     7
 
+#define MAX_RETRY_CNT  1
+#define SELECT_TIMEOUT 3
+
 /* NVM Tags specifically used for ROME 1.0 */
 #define ROME_1_0_100022_1       0x101000221
 #define ROME_1_0_100019           0x101000190
