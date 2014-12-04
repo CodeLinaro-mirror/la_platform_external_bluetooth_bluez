@@ -1,7 +1,7 @@
 /*
- * Copyright 2012 The Android Open Source Project
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  * Not a Contribution.
+ * Copyright 2012 The Android Open Source Project
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -40,6 +40,8 @@
 #define NVITEM_SIZE         2
 #define PERSIST_HEADER_LEN  3
 #define BD_ADDR_LEN         6
+#define MSM_ENABLE_FLOW_CTRL   16
+#define MSM_DISABLE_FLOW_CTRL  17
 
 unsigned char vnd_local_bd_addr[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 typedef enum {
