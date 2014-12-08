@@ -62,9 +62,11 @@ unsigned char *pdata_buffer = NULL;
 patch_info rampatch_patch_info;
 int rome_ver = ROME_VER_UNKNOWN;
 unsigned char gTlv_type;
+unsigned char gtlv_dwndcfg;
 char *rampatch_file_path;
 char *nvm_file_path;
 vnd_userial_cb_t vnd_userial;
+unsigned char wait_vsc_evt = TRUE;
 /******************************************************************************
 **  Extern variables
 ******************************************************************************/
@@ -397,14 +399,16 @@ int hci_send_vs_cmd(int fd, unsigned char *cmd, unsigned char *rsp, int size)
         goto failed;
     }
 
-    /* Check for response from the Controller */
-    if (read_vs_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE) < 0) {
-        ret = -ETIMEDOUT;
-        fprintf(stderr, "%s: Failed to get HCI-VS Event from SOC\n", __FUNCTION__);
-        goto failed;
+    if (wait_vsc_evt) {
+        /* Check for response from the Controller */
+        if (read_vs_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE) < 0) {
+            ret = -ETIMEDOUT;
+            fprintf(stderr, "%s: Failed to get HCI-VS Event from SOC\n", __FUNCTION__);
+            goto failed;
+        }
+        fprintf(stderr, "%s: Received HCI-Vendor Specific Event from SOC\n", __FUNCTION__);
     }
 
-    fprintf(stderr, "%s: Received HCI-Vendor Specific Event from SOC\n", __FUNCTION__);
 failed:
     return ret;
 }
@@ -844,6 +848,7 @@ int rome_get_tlv_file(char *file_path)
 
     /* To handle different event between rampatch and NVM */
     gTlv_type = ptlv_header->tlv_type;
+    gtlv_dwndcfg = ptlv_header->tlv.patch.dwnd_cfg;
 
     if(ptlv_header->tlv_type == TLV_TYPE_PATCH){
         fprintf(stderr, "====================================================\n");
@@ -855,6 +860,7 @@ int rome_get_tlv_file(char *file_path)
         fprintf(stderr, "Patch Data Length\t\t\t : %d bytes\n",ptlv_header->tlv_patch_data_len);
         fprintf(stderr, "Signing Format Version\t : 0x%x\n", ptlv_header->tlv.patch.sign_ver);
         fprintf(stderr, "Signature Algorithm\t\t : 0x%x\n", ptlv_header->tlv.patch.sign_algorithm);
+        fprintf(stderr, "Event Handling\t\t\t : 0x%x", ptlv_header->tlv.patch.dwnd_cfg);
         fprintf(stderr, "Reserved\t\t\t : 0x%x\n", ptlv_header->tlv.patch.reserved1);
         fprintf(stderr, "Product ID\t\t\t : 0x%04x\n", ptlv_header->tlv.patch.prod_id);
         fprintf(stderr, "Rom Build Version\t\t : 0x%04x\n", ptlv_header->tlv.patch.build_ver);
@@ -963,19 +969,83 @@ int rome_tlv_dnld_req(int fd, int tlv_size)
     fprintf(stderr, "%s: TLV size: %d, Total Seg num: %d, remain size: %d\n",
         __FUNCTION__,tlv_size, total_segment, remain_size);
 
-    for(i=0;i<total_segment ;i++){
-        /* In case of ROME 1.1, last rampatch segment command will not wait for
-            command complete event */
-        wait_cc_evt = ((rome_ver >= ROME_VER_1_1) && (gTlv_type == TLV_TYPE_PATCH )
-             && !remain_size && ((i+1) == total_segment))? FALSE: TRUE;
+    if (gTlv_type == TLV_TYPE_PATCH) {
+       /* Prior to Rome version 3.2(including inital few rampatch release of
+        * Rome 3.2), the event handling mechanism is ROME_SKIP_EVT_NONE. After
+        * few release of rampatch for Rome 3.2, the mechamism is changed to
+        * ROME_SKIP_EVT_VSE_CC. Rest of the mechanism is not used for now
+        */
+       switch(gtlv_dwndcfg)
+       {
+           case ROME_SKIP_EVT_NONE:
+              wait_vsc_evt = TRUE;
+              wait_cc_evt = TRUE;
+              fprintf(stderr, "%s: Event handling type: ROME_SKIP_EVT_NONE", __func__);
+              break;
+           case ROME_SKIP_EVT_VSE_CC:
+              wait_vsc_evt = FALSE;
+              wait_cc_evt = FALSE;
+              fprintf(stderr, "%s: Event handling type: ROME_SKIP_EVT_VSE_CC", __func__);
+              break;
+           /* Not handled for now */
+           case ROME_SKIP_EVT_VSE:
+           case ROME_SKIP_EVT_CC:
+           default:
+              fprintf(stderr, "%s: Unsupported Event handling: %d", __func__, gtlv_dwndcfg);
+              break;
+       }
+    } else {
+        wait_vsc_evt = TRUE;
+        wait_cc_evt = TRUE;
+    }
+
+    for(i = 0; i < total_segment; i++) {
+        if((i+1) == total_segment) {
+             if ((rome_ver >= ROME_VER_1_1) && (rome_ver < ROME_VER_3_2) &&
+                 (gTlv_type == TLV_TYPE_PATCH)) {
+               /* If the Rome version is from 1.1 to 3.1
+                * 1. No CCE for the last command segment but all other segment
+                * 2. All the command segments get VSE including the last one
+                */
+                wait_cc_evt = !remain_size ? FALSE: TRUE;
+             } else if ((rome_ver == ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
+                /* If the Rome version is 3.2
+                 * 1. None of the command segments receive CCE
+                 * 2. No command segments receive VSE except the last one
+                 * 3. If gtlv_dwndcfg is ROME_SKIP_EVT_NONE then the logic is
+                 *    same as Rome 2.1, 2.2, 3.0
+                 */
+                 if (gtlv_dwndcfg == ROME_SKIP_EVT_NONE) {
+                    wait_cc_evt = !remain_size ? FALSE: TRUE;
+                 } else if (gtlv_dwndcfg == ROME_SKIP_EVT_VSE_CC) {
+                    wait_vsc_evt = !remain_size ? TRUE: FALSE;
+                 }
+             }
+        }
+
         if((err = rome_tlv_dnld_segment(fd, i, MAX_SIZE_PER_TLV_SEGMENT, wait_cc_evt )) < 0)
             goto error;
     }
 
-    /* In case remain data still remain, last rampatch segment command will not wait
-        for command complete event here */
-    wait_cc_evt = ((rome_ver >= ROME_VER_1_1) && (gTlv_type == TLV_TYPE_PATCH )
-         && remain_size )? FALSE:TRUE;
+    if ((rome_ver >= ROME_VER_1_1) && (rome_ver < ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
+       /* If the Rome version is from 1.1 to 3.1
+        * 1. No CCE for the last command segment but all other segment
+        * 2. All the command segments get VSE including the last one
+        */
+        wait_cc_evt = remain_size ? FALSE: TRUE;
+    } else if ((rome_ver == ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
+        /* If the Rome version is 3.2
+         * 1. None of the command segments receive CCE
+         * 2. No command segments receive VSE except the last one
+         * 3. If gtlv_dwndcfg is ROME_SKIP_EVT_NONE then the logic is
+         *    same as Rome 2.1, 2.2, 3.0
+         */
+        if (gtlv_dwndcfg == ROME_SKIP_EVT_NONE) {
+           wait_cc_evt = remain_size ? FALSE: TRUE;
+        } else if (gtlv_dwndcfg == ROME_SKIP_EVT_VSE_CC) {
+           wait_vsc_evt = remain_size ? TRUE: FALSE;
+        }
+    }
 
     if(remain_size) err =rome_tlv_dnld_segment(fd, i, remain_size, wait_cc_evt);
 
@@ -1529,6 +1599,10 @@ int qca_soc_init(int fd, char *bdaddr)
         case ROME_VER_3_0:
             rampatch_file_path = ROME_RAMPATCH_TLV_3_0_0_PATH;
             nvm_file_path = ROME_NVM_TLV_3_0_0_PATH;
+            goto download;
+        case ROME_VER_3_2:
+            rampatch_file_path = ROME_RAMPATCH_TLV_3_0_2_PATH;
+            nvm_file_path = ROME_NVM_TLV_3_0_2_PATH;
             goto download;
         case TUFELLO_VER_1_0:
             rampatch_file_path = TF_RAMPATCH_TLV_1_0_0_PATH;
