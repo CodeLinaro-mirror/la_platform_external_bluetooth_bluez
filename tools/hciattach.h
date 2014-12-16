@@ -39,6 +39,7 @@
 #define HCI_UART_H4DS	3
 #define HCI_UART_LL	4
 #define HCI_UART_ATH3K  5
+#define HCI_UART_IBS    6
 
 #define HCI_UART_RAW_DEVICE	0
 #define HCI_UART_RESET_ON_INIT	1
@@ -56,6 +57,7 @@ int bgb2xx_init(int dd, bdaddr_t *bdaddr);
 int ath3k_init(int fd, int speed, int init_speed, char *bdaddr,
 						struct termios *ti);
 int ath3k_post(int fd, int pm);
+int qca_soc_init(int fd, char *bdaddr);
 int qualcomm_init(int fd, int speed, struct termios *ti, const char *bdaddr);
 int intel_init(int fd, int init_speed, int *speed, struct termios *ti);
 int bcm43xx_init(int fd, int speed, struct termios *ti, const char *bdaddr);

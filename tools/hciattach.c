@@ -67,6 +67,8 @@ struct uart_t {
 #define ENABLE_PM	1
 #define DISABLE_PM	0
 
+int line_disp = 1;
+
 static volatile sig_atomic_t __io_canceled = 0;
 
 static void sig_hup(int sig)
@@ -315,6 +317,12 @@ static int ath3k_ps(int fd, struct uart_t *u, struct termios *ti)
 static int ath3k_pm(int fd, struct uart_t *u, struct termios *ti)
 {
 	return ath3k_post(fd, u->pm);
+}
+
+static int qca(int fd, struct uart_t *u, struct termios *ti)
+{
+        fprintf(stderr,"qca\n");
+        return qca_soc_init(fd, u->bdaddr);
 }
 
 static int qualcomm(int fd, struct uart_t *u, struct termios *ti)
@@ -1147,6 +1155,10 @@ struct uart_t uart[] = {
 	{ "ath3k",    0x0000, 0x0000, HCI_UART_ATH3K, 115200, 115200,
 			FLOW_CTL, DISABLE_PM, NULL, ath3k_ps, ath3k_pm  },
 
+	/* QCA ROME */
+        { "qca",    0x0000, 0x0000, HCI_UART_H4, 115200, 115200,
+                        FLOW_CTL, DISABLE_PM, NULL, qca, NULL },
+
 	/* QUALCOMM BTS */
 	{ "qualcomm",   0x0000, 0x0000, HCI_UART_H4,   115200, 115200,
 			FLOW_CTL, DISABLE_PM, NULL, qualcomm, NULL },
@@ -1249,6 +1261,8 @@ static int init_uart(char *dev, struct uart_t *u, int send_break, int raw)
 		return -1;
 	}
 
+if (line_disp) {
+	fprintf(stderr, "Setting TTY to N_HCI line discipline\n");
 	/* Set TTY to N_HCI line discipline */
 	i = N_HCI;
 	if (ioctl(fd, TIOCSETD, &i) < 0) {
@@ -1265,6 +1279,7 @@ static int init_uart(char *dev, struct uart_t *u, int send_break, int raw)
 		perror("Can't set device");
 		return -1;
 	}
+}
 
 	if (u->post && u->post(fd, u, &ti) < 0)
 		return -1;
@@ -1297,7 +1312,7 @@ int main(int argc, char *argv[])
 	printpid = 0;
 	raw = 0;
 
-	while ((opt=getopt(argc, argv, "bnpt:s:lr")) != EOF) {
+	while ((opt=getopt(argc, argv, "bnpt:s:lrf:")) != EOF) {
 		switch(opt) {
 		case 'b':
 			send_break = 1;
@@ -1328,6 +1343,11 @@ int main(int argc, char *argv[])
 
 		case 'r':
 			raw = 1;
+			break;
+
+		case 'f':
+			line_disp = atoi(optarg);
+			fprintf(stderr, "Line_disp val : %d\n", line_disp);
 			break;
 
 		default:
@@ -1392,6 +1412,7 @@ int main(int argc, char *argv[])
 		case 5:
 			u->bdaddr = argv[optind];
 			break;
+
 		}
 	}
 
@@ -1468,12 +1489,15 @@ int main(int argc, char *argv[])
 			break;
 	}
 
+if (line_disp) {
 	/* Restore TTY line discipline */
+	fprintf(stderr, "Restoring the Line Discipline driver\n");
 	ld = N_TTY;
 	if (ioctl(n, TIOCSETD, &ld) < 0) {
 		perror("Can't restore line discipline");
 		exit(1);
 	}
+}
 
 	return 0;
 }
