@@ -809,6 +809,7 @@ int rome_get_tlv_file(char *file_path)
     tlv_nvm_hdr *nvm_ptr;
     unsigned char data_buf[PRINT_BUF_SIZE]={0,};
     unsigned char *nvm_byte_ptr;
+    unsigned char bdaddr[6];
 
     fprintf(stderr, "File Open (%s)\n", file_path);
     pFile = fopen ( file_path , "r" );
@@ -886,9 +887,10 @@ int rome_get_tlv_file(char *file_path)
             nvm_byte_ptr+=sizeof(tlv_nvm_hdr);
 
             /* Write BD Address */
-            if(nvm_ptr->tag_id == TAG_NUM_2){
-                memcpy(nvm_byte_ptr, vnd_local_bd_addr, 6);
-                fprintf(stderr, "BD Address: %.02x:%.02x:%.02x:%.02x:%.02x:%.02x\n",
+            if(nvm_ptr->tag_id == TAG_NUM_2 && read_bd_address(&bdaddr) == 0) {
+                memcpy(nvm_byte_ptr, bdaddr, 6);
+                fprintf(stderr, "Overriding default BD ADDR with user"
+                  " programmed BD Address: %02x:%02x:%02x:%02x:%02x:%02x\n",
                     *nvm_byte_ptr, *(nvm_byte_ptr+1), *(nvm_byte_ptr+2),
                     *(nvm_byte_ptr+3), *(nvm_byte_ptr+4), *(nvm_byte_ptr+5));
             }
@@ -1451,6 +1453,54 @@ error:
 
 }
 
+int read_bd_address(unsigned char *bdaddr)
+{
+  int fd = -1;
+  int readPtr = 0;
+  unsigned char data[BD_ADDR_LEN];
+
+  /* Open the persist file for reading device address*/
+  fd = open("/etc/bluetooth/.bt_nv.bin", O_RDONLY);
+  if(fd < 0)
+  {
+    fprintf(stderr, "%s: Open failed: Programming default BD ADDR\n", __func__);
+    return -1;
+  }
+
+  /* Read the NVM Header : fp will be advanced by readPtr number of bytes */
+  readPtr = read(fd, data, PERSIST_HEADER_LEN);
+  if (readPtr > 0)
+    fprintf(stderr, "%s: Persist header data: %02x \t %02x \t %02x\n", __func__,
+      data[NVITEM], data[RDWR_PROT], data[NVITEM_SIZE]);
+  else {
+    fprintf(stderr, "%s: Read from persist memory failed : Programming default"
+      " BD ADDR\n");
+    close(fd);
+    return -1;
+  }
+
+  /* Check for BD ADDR length before programming */
+  if(data[NVITEM_SIZE] != BD_ADDR_LEN) {
+    fprintf(stderr, "Invalid BD ADDR: Programming default BD ADDR!\n");
+    close(fd);
+    return -1;
+  }
+
+  /* Read the BD ADDR info */
+  readPtr = read(fd, data, BD_ADDR_LEN);
+  if (readPtr > 0)
+    fprintf(stderr, "BD-ADDR: ==> %02x:%02x:%02x:%02x:%02x:%02x\n", data[0],
+      data[1], data[2], data[3], data[4], data[5]);
+  else {
+    fprintf(stderr, "%s: Read from persist memory failed : Programming default"
+      " BD ADDR\n");
+    close(fd);
+    return -1;
+  }
+  memcpy(bdaddr, data, BD_ADDR_LEN);
+  close(fd);
+  return 0;
+}
 
 int qca_soc_init(int fd, char *bdaddr)
 {
