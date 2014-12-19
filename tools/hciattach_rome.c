@@ -326,42 +326,87 @@ failed:
 }
 
 
+int wait_for_data(int fd, int maxTimeOut)
+{
+    fd_set infids;
+    struct timeval timeout;
+
+    if (maxTimeOut <= 0) {
+        fprintf(stderr, "%s: Invalid timeout value specified", __func__);
+        return -EINVAL;
+    }
+
+    FD_ZERO (&infids);
+    FD_SET (fd, &infids);
+    timeout.tv_sec = maxTimeOut;
+    timeout.tv_usec = 0;
+
+    /* Check whether data is available in TTY buffer before calling read() */
+    if (select (fd + 1, &infids, NULL, NULL, &timeout) < 1) {
+        fprintf(stderr, "%s: Timing out on select for %d secs.\n", __FUNCTION__, maxTimeOut);
+        return -1;
+    }
+    else
+        fprintf(stderr, "%s: HCI-VS-EVENT available in TTY Serial buffer\n",
+            __FUNCTION__);
+
+    return 1;
+}
+
 /*
  * Read an VS HCI event from the given file descriptor.
  */
 int read_vs_hci_event(int fd, unsigned char* buf, int size)
 {
-    int remain, r;
+    int remain, r, retry = 0;
     int count = 0;
-    fd_set infids;
-    struct timeval timeout;
 
     if (size <= 0) {
         fprintf(stderr, "Invalid size arguement!\n");
         return -1;
     }
 
-    fprintf(stderr, "%s: Wait for HCI-Vendor Specfic Event from SOC\n", __FUNCTION__);
+    fprintf(stderr, "%s: Wait for HCI-Vendor Specfic Event from SOC\n",
+        __FUNCTION__);
 
-    FD_ZERO (&infids);
-    FD_SET (fd, &infids);
-    timeout.tv_sec = 3;
-    timeout.tv_usec = 0;  /* half second is a long time at 115.2 Kbps */
-
-    if (select (fd + 1, &infids, NULL, NULL, &timeout) < 1)
-	    fprintf(stderr, "%s: Timing out on select for 3 secs.\n", __FUNCTION__);
-    else
-	    fprintf(stderr, "%s: Data available in TTY Serial buffer\n", __FUNCTION__);
+    /* Check whether data is available in TTY buffer before calling read() */
+    if (wait_for_data(fd, SELECT_TIMEOUT) < 1)
+        return -1;
 
     /* The first byte identifies the packet type. For HCI event packets, it
      * should be 0x04, so we read until we get to the 0x04. */
     /* It will keep reading until find 0x04 byte */
     while (1) {
+            /* Read UART Buffer for HCI-DATA */
             r = read(fd, buf, 1);
-            if (r <= 0)
-                    return -1;
-            if (buf[0] == 0x04)
+            if (r <= 0) {
+                fprintf(stderr, "%s: read() failed. error: %d\n",
+                    __FUNCTION__, r);
+                return -1;
+            }
+
+            /* Check if received data is HCI-DATA or not.
+             * If not HCI-DATA, then retry reading the UART Buffer once.
+             * Sometimes there could be corruption on the UART lines and to
+             * avoid that retry once reading the UART Buffer for HCI-DATA.
+             */
+            if (buf[0] == 0x04) { /* Recvd. HCI DATA */
+                    retry = 0;
                     break;
+            }
+            else if (retry < MAX_RETRY_CNT){ /* Retry mechanism */
+                retry++;
+                fprintf(stderr, "%s: Not an HCI-VS-Event! buf[0]: %d",
+                    __FUNCTION__, buf[0]);
+                if (wait_for_data(fd, SELECT_TIMEOUT) < 1)
+                    return -1;
+                else /* Data available in UART Buffer: Continue to read */
+                    continue;
+            }
+            else { /* RETRY failed : Exiting with failure */
+                fprintf(stderr, "%s: RETRY failed!", __FUNCTION__);
+                return -1;
+            }
     }
     count++;
 

@@ -163,16 +163,34 @@ int read_hci_event(int fd, unsigned char* buf, int size)
 {
 	int remain, r;
 	int count = 0;
+	fd_set infids;
+	struct timeval timeout;
 
 	if (size <= 0)
 		return -1;
+
+	FD_ZERO (&infids);
+	FD_SET (fd, &infids);
+	timeout.tv_sec = 3;
+	timeout.tv_usec = 0;
+
+	/* Check whether data is available in TTY buffer before calling read() */
+	if (select (fd + 1, &infids, NULL, NULL, &timeout) < 1) {
+		fprintf(stderr, "%s: Timing out on select for 3 secs.\n", __FUNCTION__);
+		return -1;
+	}
+	else
+		fprintf(stderr, "%s: Data(HCI-CMD-COMP-EVENT) available in TTY Serial buffer\n", __FUNCTION__);
 
 	/* The first byte identifies the packet type. For HCI event packets, it
 	 * should be 0x04, so we read until we get to the 0x04. */
 	while (1) {
 		r = read(fd, buf, 1);
-		if (r <= 0)
+		if (r <= 0) {
+	                fprintf(stderr, "%s: read() failed with return value: %d\n",
+                            __FUNCTION__, r);
 			return -1;
+                }
 		if (buf[0] == 0x04)
 			break;
 	}
