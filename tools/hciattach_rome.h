@@ -204,7 +204,8 @@ typedef struct
 #define ROME_NVM_TLV_2_0_1_PATH         "/lib/firmware/nvm_tlv_2.1.bin"
 #define ROME_RAMPATCH_TLV_3_0_0_PATH    "/lib/firmware/rampatch_tlv_3.0.tlv"
 #define ROME_NVM_TLV_3_0_0_PATH         "/lib/firmware/nvm_tlv_3.0.bin"
-
+#define TF_RAMPATCH_TLV_1_0_0_PATH    "/lib/firmware/rampatch_tlv_tf_1.0.tlv"
+#define TF_NVM_TLV_1_0_0_PATH         "/lib/firmware/nvm_tlv_tf_1.0.bin"
 
 /******************************************************************************
 **  Local type definitions

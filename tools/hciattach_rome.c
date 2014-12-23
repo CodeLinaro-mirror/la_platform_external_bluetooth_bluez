@@ -1616,9 +1616,12 @@ int qca_soc_init(int fd, char *bdaddr)
             nvm_file_path = ROME_NVM_TLV_2_0_1_PATH;
             goto download;
         case ROME_VER_3_0:
-        case TUFELLO_VER_1_0:
             rampatch_file_path = ROME_RAMPATCH_TLV_3_0_0_PATH;
             nvm_file_path = ROME_NVM_TLV_3_0_0_PATH;
+            goto download;
+        case TUFELLO_VER_1_0:
+            rampatch_file_path = TF_RAMPATCH_TLV_1_0_0_PATH;
+            nvm_file_path = TF_NVM_TLV_1_0_0_PATH;
 
 download:
             /* Change baud rate 115.2 kbps to 3Mbps*/
