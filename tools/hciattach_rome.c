@@ -1,6 +1,6 @@
 /*
  *
- *  Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *  Not a Contribution.
  *
  *  Copyright 2012 The Android Open Source Project
@@ -31,6 +31,7 @@
 
 #define LOG_TAG "bt_vendor"
 #include <stdio.h>
+#include <unistd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -137,6 +138,16 @@ void userial_vendor_set_baud(unsigned char userial_baud)
     unsigned int tcio_baud;
     fprintf(stderr, "## userial_vendor_set_baud: %d\n", userial_baud);
 
+    if (tcgetattr(vnd_userial.fd, &vnd_userial.termios) < 0) {
+            perror("Can't get port settings");
+            return;
+    }
+    cfmakeraw(&vnd_userial.termios);
+    vnd_userial.termios.c_cflag |= CLOCAL;
+    vnd_userial.termios.c_cflag |= CREAD;
+    vnd_userial.termios.c_cflag |= CS8;
+    tcsetattr(vnd_userial.fd, TCSANOW, &vnd_userial.termios);
+
     userial_to_tcio_baud(userial_baud, &tcio_baud);
 
     cfsetospeed(&vnd_userial.termios, tcio_baud);
@@ -167,6 +178,7 @@ int userial_vendor_ioctl(int fd, userial_vendor_ioctl_op_t op, int *p_data)
     cfmakeraw(&ti);
     ti.c_cflag |= CLOCAL;
     ti.c_cflag |= CREAD;
+    ti.c_cflag |= CS8;
 
     switch(op)
     {
@@ -1375,6 +1387,29 @@ error:
 
 }
 
+static void flow_control(int fd, int opt)
+{
+    struct termios c_opt;
+
+    ioctl(fd, TIOCMGET, &c_opt);
+    c_opt.c_cc[VTIME] = 0; /* inter-character timer unused */
+    c_opt.c_cc[VMIN] = 0; /* blocking read until 8 chars received */
+    c_opt.c_cflag &= ~CSIZE;
+    c_opt.c_cflag |= (CS8 | CLOCAL | CREAD);
+    if (MSM_ENABLE_FLOW_CTRL)
+        c_opt.c_cflag |= CRTSCTS;
+    else if (MSM_DISABLE_FLOW_CTRL)
+        c_opt.c_cflag |= ~CRTSCTS;
+    else {
+        fprintf(stderr, "%s: Incorrect option passed for TIOCMSET\n", __func__);
+        return;
+    }
+    c_opt.c_iflag = IGNPAR;
+    c_opt.c_oflag = 0;
+    c_opt.c_lflag = 0;
+    ioctl(fd, TIOCMSET, &c_opt);
+}
+
 
 int rome_set_baudrate_req(int fd)
 {
@@ -1394,12 +1429,10 @@ int rome_set_baudrate_req(int fd)
 
     /* Total length of the packet to be sent to the Controller */
     size = (HCI_CMD_IND + HCI_COMMAND_HDR_SIZE + VSC_SET_BAUDRATE_REQ_LEN);
+
     /* Flow off during baudrate change */
-    if ((err = userial_vendor_ioctl(fd, USERIAL_OP_FLOW_OFF , &flags)) < 0)
-    {
-      fprintf(stderr, "%s: HW Flow-off error: 0x%x\n", __FUNCTION__, err);
-      goto error;
-    }
+    flow_control(fd, MSM_DISABLE_FLOW_CTRL);
+
     /* Send the HCI command packet to UART for transmission */
     fprintf(stderr, "%s: HCI CMD: 0x%x 0x%x 0x%x 0x%x 0x%x\n", __FUNCTION__, cmd[0], cmd[1], cmd[2], cmd[3],cmd[4]) ;
     err = write(fd, cmd, size);
@@ -1411,11 +1444,8 @@ int rome_set_baudrate_req(int fd)
     userial_vendor_set_baud(USERIAL_BAUD_3M);
 
     /* Flow on after changing local uart baudrate */
-    if ((err = userial_vendor_ioctl(fd, USERIAL_OP_FLOW_ON , &flags)) < 0)
-    {
-        fprintf(stderr, "%s: HW Flow-on error: 0x%x \n", __FUNCTION__, err);
-        return err;
-    }
+    flow_control(fd, MSM_ENABLE_FLOW_CTRL);
+
     /* Check for response from the Controller */
     if ((err =read_vs_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE)) < 0) {
             fprintf(stderr, "%s: Failed to get HCI-VS Event from SOC\n", __FUNCTION__);
@@ -1458,11 +1488,8 @@ int rome_hci_reset_req(int fd)
     size = (HCI_CMD_IND + HCI_COMMAND_HDR_SIZE);
 
     /* Flow off during baudrate change */
-    if ((err = userial_vendor_ioctl(fd, USERIAL_OP_FLOW_OFF , &flags)) < 0)
-    {
-      fprintf(stderr, "%s: HW Flow-off error: 0x%x\n", __FUNCTION__, err);
-      goto error;
-    }
+    flow_control(fd, MSM_DISABLE_FLOW_CTRL);
+
     /* Send the HCI command packet to UART for transmission */
     fprintf(stderr, "%s: HCI CMD: 0x%x 0x%x 0x%x 0x%x\n", __FUNCTION__, cmd[0], cmd[1], cmd[2], cmd[3]);
     err = write(fd, cmd, size);
@@ -1475,11 +1502,8 @@ int rome_hci_reset_req(int fd)
      userial_vendor_set_baud(USERIAL_BAUD_3M);
 
     /* Flow on after changing local uart baudrate */
-    if ((err = userial_vendor_ioctl(fd, USERIAL_OP_FLOW_ON , &flags)) < 0)
-    {
-        fprintf(stderr, "%s: HW Flow-on error: 0x%x \n", __FUNCTION__, err);
-        return err;
-    }
+    flow_control(fd, MSM_ENABLE_FLOW_CTRL);
+
     /* Wait for command complete event */
     err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
     if ( err < 0) {
@@ -1546,7 +1570,6 @@ int qca_soc_init(int fd, char *bdaddr)
     int err = -1;
     int size;
 
-    fprintf(stderr, " %s \n", __FUNCTION__);
     vnd_userial.fd = fd;
     /* Get Rome version information */
     if((err = rome_patch_ver_req(fd)) <0){
