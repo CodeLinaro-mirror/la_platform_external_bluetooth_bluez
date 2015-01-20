@@ -340,7 +340,7 @@ static int ath3k_pm(int fd, struct uart_t *u, struct termios *ti)
 static int qca(int fd, struct uart_t *u, struct termios *ti)
 {
         fprintf(stderr,"qca\n");
-        return qca_soc_init(fd, u->bdaddr);
+        return qca_soc_init(fd, u->speed, u->bdaddr);
 }
 
 static int qualcomm(int fd, struct uart_t *u, struct termios *ti)
