@@ -1,6 +1,6 @@
 /*
  *
- *  Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  *  Not a Contribution.
  *
  *  Copyright 2012 The Android Open Source Project
@@ -873,6 +873,44 @@ error:
     return err;
 }
 
+int get_value_from_config(char *file_path,char *param)
+{
+    FILE *pfile = NULL;
+    char *line = NULL;
+    char *pch = NULL;
+    char param_str[20];
+    int bytes_read = 0, position;
+    int ret = -1;
+
+    if (!file_path || !param) {
+        fprintf(stderr,"Invalid arguments\n");
+        return -EINVAL;
+    }
+
+    pfile = fopen(file_path, "r" );
+    if (!pfile) {
+        fprintf(stderr, "Failed to open %s\n", file_path);
+        return ret;
+    }
+
+    while (getline(&line, &bytes_read, pfile) > 0 ) {
+        if (line[0] != '#'  && line[0] != '\n') {
+            pch = memchr(line, '=', strlen(line));
+            if (pch != NULL) {
+                position = pch - line;
+                strncpy(param_str, line, position);
+                if (strncmp(param_str, param, position) == 0) {
+                    ret = atoi(pch + 1);
+                    break;
+                }
+            }
+        }
+    }
+    free(line);
+    fclose(pfile);
+    return ret;
+}
+
 int rome_get_tlv_file(char *file_path)
 {
     FILE * pFile;
@@ -884,7 +922,7 @@ int rome_get_tlv_file(char *file_path)
     unsigned char data_buf[PRINT_BUF_SIZE]={0,};
     unsigned char *nvm_byte_ptr;
     unsigned char bdaddr[6];
-
+    unsigned short pcm_value;
     fprintf(stderr, "File Open (%s)\n", file_path);
     pFile = fopen ( file_path , "r" );
     if (pFile==NULL) {;
@@ -970,9 +1008,30 @@ int rome_get_tlv_file(char *file_path)
                     *nvm_byte_ptr, *(nvm_byte_ptr+1), *(nvm_byte_ptr+2),
                     *(nvm_byte_ptr+3), *(nvm_byte_ptr+4), *(nvm_byte_ptr+5));
             }
+            /* Read from file and check what PCM Configuration is required:
+             * Master = 0 /Slave = 1 */
+            /* Override PCM configuration */
+            if (nvm_ptr->tag_id == TAG_NUM_44) {
+                if ((pcm_value =
+                    get_value_from_config(PCM_CONFIG_FILE_PATH, "PCM")) >= 0) {
 
-            for(i =0;(i<nvm_ptr->tag_len && (i*3 + 2) <PRINT_BUF_SIZE);i++)
-                snprintf((char *) data_buf, PRINT_BUF_SIZE, "%s%.02x ", (char *)data_buf, *(nvm_byte_ptr + i));
+                    if (pcm_value == PCM_SLAVE) {
+                        nvm_byte_ptr[PCM_MS_OFFSET_1] |=
+                                                    (1 << PCM_ROLE_BIT_OFFSET);
+                        nvm_byte_ptr[PCM_MS_OFFSET_2] |=
+                                                    (1 << PCM_ROLE_BIT_OFFSET);
+                    } else if (pcm_value == PCM_MASTER) {
+                        nvm_byte_ptr[PCM_MS_OFFSET_1] &=
+                                                 (~(1 << PCM_ROLE_BIT_OFFSET));
+                        nvm_byte_ptr[PCM_MS_OFFSET_2] &=
+                                                 (~(1 << PCM_ROLE_BIT_OFFSET));
+                    }
+                }
+            }
+
+            for(i =0;(i<nvm_ptr->tag_len && (i*3 + 2) < PRINT_BUF_SIZE);i++)
+                snprintf((char *) data_buf, PRINT_BUF_SIZE, "%s%.02x ",
+                    (char *)data_buf, *(nvm_byte_ptr + i));
 
             fprintf(stderr, "TAG Data\t\t\t : %s\n", data_buf);
 

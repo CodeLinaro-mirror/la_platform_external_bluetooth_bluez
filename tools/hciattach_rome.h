@@ -179,8 +179,15 @@ typedef struct
 #define NVM_ACCESS_SET            0x01
 #define TAG_NUM_OFFSET             5
 #define TAG_NUM_2                       2
+#define TAG_NUM_44                      44
 #define TAG_BDADDR_OFFSET     7
 
+#define PCM_MS_OFFSET_1       9
+#define PCM_MS_OFFSET_2       33
+
+#define PCM_SLAVE            1
+#define PCM_MASTER           0
+#define PCM_ROLE_BIT_OFFSET  4
 #define MAX_RETRY_CNT  1
 #define SELECT_TIMEOUT 3
 
@@ -217,6 +224,7 @@ typedef struct
 #define ROME_SKIP_EVT_CC       0x02
 #define ROME_SKIP_EVT_VSE_CC   0x03
 
+#define PCM_CONFIG_FILE_PATH        "/etc/bluetooth/pcm.conf"
 /******************************************************************************
 **  Local type definitions
 ******************************************************************************/
