@@ -621,7 +621,7 @@ int rome_edl_set_patch_request(int fd)
         -1, PATCH_HDR_LEN + 1);
 
     /* Total length of the packet to be sent to the Controller */
-    size = (HCI_CMD_IND	+ HCI_COMMAND_HDR_SIZE + cmd[PLEN]);
+    size = (HCI_CMD_IND + HCI_COMMAND_HDR_SIZE + cmd[PLEN]);
 
     /* Send HCI Command packet to Controller */
     err = hci_send_vs_cmd(fd, (unsigned char *)cmd, rsp, size);
@@ -670,7 +670,7 @@ int rome_edl_patch_download_request(int fd)
         index, MAX_DATA_PER_SEGMENT);
 
         /* Total length of the packet to be sent to the Controller */
-        size = (HCI_CMD_IND	+ HCI_COMMAND_HDR_SIZE + cmd[PLEN]);
+        size = (HCI_CMD_IND + HCI_COMMAND_HDR_SIZE + cmd[PLEN]);
 
         /* Initialize the RSP packet everytime to 0 */
         memset(rsp, 0x0, HCI_MAX_EVENT_SIZE);
@@ -707,7 +707,7 @@ int rome_edl_patch_download_request(int fd)
         memset(rsp, 0x0, HCI_MAX_EVENT_SIZE);
 
         /* Total length of the packet to be sent to the Controller */
-        size = (HCI_CMD_IND	+ HCI_COMMAND_HDR_SIZE + cmd[PLEN]);
+        size = (HCI_CMD_IND + HCI_COMMAND_HDR_SIZE + cmd[PLEN]);
 
         /* Send HCI Command packet to Controller */
         err = hci_send_vs_cmd(fd, (unsigned char *)cmd, rsp, size);
@@ -824,7 +824,7 @@ int rome_attach_rampatch(int fd)
         -1, EDL_PATCH_CMD_LEN);
 
     /* Total length of the packet to be sent to the Controller */
-    size = (HCI_CMD_IND	+ HCI_COMMAND_HDR_SIZE + cmd[PLEN]);
+    size = (HCI_CMD_IND + HCI_COMMAND_HDR_SIZE + cmd[PLEN]);
 
     /* Send HCI Command packet to Controller */
     err = hci_send_vs_cmd(fd, (unsigned char *)cmd, rsp, size);
@@ -854,7 +854,7 @@ int rome_rampatch_reset(int fd)
                                         -1, EDL_PATCH_CMD_LEN);
 
     /* Total length of the packet to be sent to the Controller */
-    size = (HCI_CMD_IND	+ HCI_COMMAND_HDR_SIZE + EDL_PATCH_CMD_LEN);
+    size = (HCI_CMD_IND + HCI_COMMAND_HDR_SIZE + EDL_PATCH_CMD_LEN);
 
     /* Send HCI Command packet to Controller */
     err = write(fd, cmd, size);
@@ -1058,7 +1058,7 @@ int rome_tlv_dnld_segment(int fd, int index, int seg_size, unsigned char wait_cc
     unsigned char cmd[HCI_MAX_CMD_SIZE];
     unsigned char rsp[HCI_MAX_EVENT_SIZE];
 
-    fprintf(stderr, "%s: Downloading TLV Patch segment no.%d, size:%d\n", __FUNCTION__, index, seg_size);
+    fprintf(stderr, "%s: Downloading TLV Patch segment no.%d, size:%d wait_cc_evt = 0x%x\n", __FUNCTION__, index, seg_size, wait_cc_evt);
 
     /* Frame the HCI CMD PKT to be sent to Controller*/
     frame_hci_cmd_pkt(cmd, EDL_PATCH_TLV_REQ_CMD, 0, index, seg_size);
@@ -1092,6 +1092,7 @@ int rome_tlv_dnld_req(int fd, int tlv_size)
 {
     int  total_segment, remain_size, i, err = -1;
     unsigned char wait_cc_evt;
+    unsigned int rom = rome_ver >> 16;
 
     total_segment = tlv_size/MAX_SIZE_PER_TLV_SEGMENT;
     remain_size = (tlv_size < MAX_SIZE_PER_TLV_SEGMENT)?\
@@ -1132,14 +1133,15 @@ int rome_tlv_dnld_req(int fd, int tlv_size)
 
     for(i = 0; i < total_segment; i++) {
         if((i+1) == total_segment) {
-             if ((rome_ver >= ROME_VER_1_1) && (rome_ver < ROME_VER_3_2) &&
+             if ((rom >= ROME_PATCH_VER_0100) && (rom < ROME_PATCH_VER_0302) &&
                  (gTlv_type == TLV_TYPE_PATCH)) {
                /* If the Rome version is from 1.1 to 3.1
                 * 1. No CCE for the last command segment but all other segment
                 * 2. All the command segments get VSE including the last one
                 */
                 wait_cc_evt = !remain_size ? FALSE: TRUE;
-             } else if ((rome_ver == ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
+             } else if ((rom == ROME_PATCH_VER_0302) &&
+                             (gTlv_type == TLV_TYPE_PATCH)) {
                 /* If the Rome version is 3.2
                  * 1. None of the command segments receive CCE
                  * 2. No command segments receive VSE except the last one
@@ -1158,13 +1160,14 @@ int rome_tlv_dnld_req(int fd, int tlv_size)
             goto error;
     }
 
-    if ((rome_ver >= ROME_VER_1_1) && (rome_ver < ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
+    if ((rom >= ROME_PATCH_VER_0100) && (rom < ROME_PATCH_VER_0302) &&
+                                               (gTlv_type == TLV_TYPE_PATCH)) {
        /* If the Rome version is from 1.1 to 3.1
         * 1. No CCE for the last command segment but all other segment
         * 2. All the command segments get VSE including the last one
         */
         wait_cc_evt = remain_size ? FALSE: TRUE;
-    } else if ((rome_ver == ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
+    } else if ((rom == ROME_PATCH_VER_0302) && (gTlv_type == TLV_TYPE_PATCH)) {
         /* If the Rome version is 3.2
          * 1. None of the command segments receive CCE
          * 2. No command segments receive VSE except the last one
@@ -1778,6 +1781,10 @@ int qca_soc_init(int fd, char *bdaddr)
         case TUFELLO_VER_1_0:
             rampatch_file_path = TF_RAMPATCH_TLV_1_0_0_PATH;
             nvm_file_path = TF_NVM_TLV_1_0_0_PATH;
+            goto download;
+        case TUFELLO_VER_1_1:
+            rampatch_file_path = TF_RAMPATCH_TLV_1_0_1_PATH;
+            nvm_file_path = TF_NVM_TLV_1_0_1_PATH;
 
 download:
             /* Change baud rate 115.2 kbps to 3Mbps*/
@@ -1802,7 +1809,7 @@ download:
                 fprintf(stderr, "HCI Reset Failed !!!\n");
                 goto error;
             }
-	    fprintf(stderr, "HCI Reset is done\n");
+            fprintf(stderr, "HCI Reset is done\n");
 
             break;
         case ROME_VER_UNKNOWN:
