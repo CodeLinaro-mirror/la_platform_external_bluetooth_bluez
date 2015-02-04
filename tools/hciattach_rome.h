@@ -215,8 +215,10 @@ typedef struct
 #define ROME_NVM_TLV_3_0_0_PATH         "/lib/firmware/nvm_tlv_3.0.bin"
 #define ROME_RAMPATCH_TLV_3_0_2_PATH    "/lib/firmware/rampatch_tlv_3.2.tlv"
 #define ROME_NVM_TLV_3_0_2_PATH         "/lib/firmware/nvm_tlv_3.2.bin"
-#define TF_RAMPATCH_TLV_1_0_0_PATH    "/lib/firmware/rampatch_tlv_tf_1.0.tlv"
-#define TF_NVM_TLV_1_0_0_PATH         "/lib/firmware/nvm_tlv_tf_1.0.bin"
+#define TF_RAMPATCH_TLV_1_0_0_PATH      "/lib/firmware/qca/rampatch_tlv_tf_1.0.tlv"
+#define TF_NVM_TLV_1_0_0_PATH           "/lib/firmware/qca/nvm_tlv_tf_1.0.bin"
+#define TF_RAMPATCH_TLV_1_0_1_PATH      "/lib/firmware/qca/rampatch_tlv_tf_1.1.tlv"
+#define TF_NVM_TLV_1_0_1_PATH           "/lib/firmware/qca/nvm_tlv_tf_1.1.bin"
 
 /* This header value in rampatch file decides event handling mechanism in the HOST */
 #define ROME_SKIP_EVT_NONE     0x00
@@ -334,6 +336,7 @@ enum{
     ROME_SOC_ID_11 = 0x00000011,
     ROME_SOC_ID_13 = 0x00000013,
     ROME_SOC_ID_22 = 0x00000022,
+    ROME_SOC_ID_23 = 0x00000023,
     ROME_SOC_ID_44 = 0x00000044
 };
 
@@ -345,6 +348,7 @@ enum{
     ROME_VER_2_1 = ((ROME_PATCH_VER_0200 << 16 ) | ROME_SOC_ID_11 ),
     ROME_VER_3_0 = ((ROME_PATCH_VER_0300 << 16 ) | ROME_SOC_ID_22 ),
     ROME_VER_3_2 = ((ROME_PATCH_VER_0302 << 16 ) | ROME_SOC_ID_44 ),
-    TUFELLO_VER_1_0 = ((ROME_PATCH_VER_0300 << 16 ) | ROME_SOC_ID_13 )
+    TUFELLO_VER_1_0 = ((ROME_PATCH_VER_0300 << 16 ) | ROME_SOC_ID_13 ),
+    TUFELLO_VER_1_1 = ((ROME_PATCH_VER_0302 << 16 ) | ROME_SOC_ID_23 )
 };
 #endif /* HW_ROME_H */
