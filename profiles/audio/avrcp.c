@@ -1799,12 +1799,18 @@ static gboolean avrcp_get_play_status_rsp(struct avctp *conn,
 					void *user_data)
 {
 	struct avrcp *session = user_data;
-	struct avrcp_player *player = session->controller->player;
-	struct media_player *mp = player->user_data;
+	struct avrcp_player *player;
+	struct media_player *mp;
 	struct avrcp_header *pdu = (void *) operands;
 	uint32_t duration;
 	uint32_t position;
 	uint8_t status;
+
+	if (!session || !session->controller)
+		return FALSE;
+
+	player = session->controller->player;
+	mp = player->user_data;
 
 	if (pdu == NULL || code == AVC_CTYPE_REJECTED ||
 						ntohs(pdu->params_len) != 9)
@@ -1863,11 +1869,17 @@ static gboolean avrcp_player_value_rsp(struct avctp *conn,
 					void *user_data)
 {
 	struct avrcp *session = user_data;
-	struct avrcp_player *player = session->controller->player;
-	struct media_player *mp = player->user_data;
+	struct avrcp_player *player;
+	struct media_player *mp;
 	struct avrcp_header *pdu = (void *) operands;
 	uint8_t count;
 	int i;
+
+	if (!session || !session->controller)
+		return FALSE;
+
+	player = session->controller->player;
+	mp = player->user_data;
 
 	if (pdu == NULL) {
 		media_player_set_setting(mp, "Error", "Timeout");
@@ -2019,9 +2031,14 @@ static gboolean avrcp_get_element_attributes_rsp(struct avctp *conn,
 						void *user_data)
 {
 	struct avrcp *session = user_data;
-	struct avrcp_player *player = session->controller->player;
+	struct avrcp_player *player;
 	struct avrcp_header *pdu = (void *) operands;
 	uint8_t count;
+
+	if (!session || !session->controller)
+		return FALSE;
+
+	player = session->controller->player;
 
 	if (code == AVC_CTYPE_REJECTED)
 		return FALSE;
