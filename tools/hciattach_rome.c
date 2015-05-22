@@ -1525,10 +1525,10 @@ static void flow_control(int fd, int opt)
     c_opt.c_cc[VMIN] = 0; /* blocking read until 8 chars received */
     c_opt.c_cflag &= ~CSIZE;
     c_opt.c_cflag |= (CS8 | CLOCAL | CREAD);
-    if (MSM_ENABLE_FLOW_CTRL)
+    if (opt == MSM_ENABLE_FLOW_CTRL)
         c_opt.c_cflag |= CRTSCTS;
-    else if (MSM_DISABLE_FLOW_CTRL)
-        c_opt.c_cflag |= ~CRTSCTS;
+    else if (opt == MSM_DISABLE_FLOW_CTRL)
+        c_opt.c_cflag &= ~CRTSCTS;
     else {
         fprintf(stderr, "%s: Incorrect option passed for TIOCMSET\n", __func__);
         return;
