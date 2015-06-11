@@ -1779,13 +1779,14 @@ int qca_soc_init(int fd, int speed, char *bdaddr)
 
     vnd_userial.fd = fd;
 
+#ifdef _PLATFORM_MDM_
     /* Vote for UART CLK prior to FW download */
     err = ioctl(fd, USERIAL_OP_CLK_ON);
     if (err < 0) {
         fprintf(stderr, "%s: Failed to vote UART CLK ON\n", __func__);
         return -1;
     }
-
+#endif
     /* Get Rome version information */
     if((err = rome_patch_ver_req(fd)) <0){
         fprintf(stderr, "%s: Fail to get Rome Version (0x%x)\n", __FUNCTION__, err);
@@ -1923,10 +1924,12 @@ download:
     }
 
 error:
+#ifdef _PLATFORM_MDM_
     /* Vote UART CLK OFF post to FW download */
     err = ioctl(fd, USERIAL_OP_CLK_OFF);
     if (err < 0)
         fprintf(stderr, "%s: Failed to vote UART CLK OFF!!!\n", __func__);
+#endif
 
     return err;
 }

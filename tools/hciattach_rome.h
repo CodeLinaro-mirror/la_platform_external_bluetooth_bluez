@@ -42,8 +42,11 @@
 #define BD_ADDR_LEN         6
 #define MSM_DISABLE_FLOW_CTRL  0
 #define MSM_ENABLE_FLOW_CTRL   1
+
+#ifdef _PLATFORM_MDM_
 #define USERIAL_OP_CLK_ON      0x5441
 #define USERIAL_OP_CLK_OFF     0x5442
+#endif
 
 unsigned char vnd_local_bd_addr[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 typedef enum {
