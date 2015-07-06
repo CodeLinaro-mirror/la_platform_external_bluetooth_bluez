@@ -933,7 +933,19 @@ int rome_get_tlv_file(char *file_path)
 
     /* Get File Size */
     fseek (pFile , 0 , SEEK_END);
-    fileSize = ftell (pFile);
+
+    if((fileSize = ftell(pFile)) < 0) {
+        fprintf(stderr, "%s: fail to get current file position\n", file_path);
+        fclose(pFile);
+        return -1;
+    }
+
+    if(fileSize == 0) {
+        fprintf(stderr, "%s: no content in the file\n", file_path);
+        fclose(pFile);
+        return -1;
+    }
+
     rewind (pFile);
 
     pdata_buffer = (unsigned char*) malloc (sizeof(char)*fileSize);
@@ -1107,7 +1119,7 @@ int rome_tlv_dnld_segment(int fd, int index, int seg_size, unsigned char wait_cc
 int rome_tlv_dnld_req(int fd, int tlv_size)
 {
     int  total_segment, remain_size, i, err = -1;
-    unsigned char wait_cc_evt;
+    unsigned char wait_cc_evt = FALSE;
 
     total_segment = tlv_size/MAX_SIZE_PER_TLV_SEGMENT;
     remain_size = (tlv_size < MAX_SIZE_PER_TLV_SEGMENT)?\
