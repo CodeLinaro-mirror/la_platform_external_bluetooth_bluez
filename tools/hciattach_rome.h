@@ -251,10 +251,17 @@ typedef struct
 #define ROME_NVM_TLV_3_0_0_PATH         "/lib/firmware/nvm_tlv_3.0.bin"
 #define ROME_RAMPATCH_TLV_3_0_2_PATH    "/lib/firmware/rampatch_tlv_3.2.tlv"
 #define ROME_NVM_TLV_3_0_2_PATH         "/lib/firmware/nvm_tlv_3.2.bin"
+#ifdef _PLATFORM_MDM_
+#define TF_RAMPATCH_TLV_1_0_0_PATH      "/lib/firmware/rampatch_tlv_tf_1.0.tlv"
+#define TF_NVM_TLV_1_0_0_PATH           "/lib/firmware/nvm_tlv_tf_1.0.bin"
+#define TF_RAMPATCH_TLV_1_0_1_PATH      "/lib/firmware/rampatch_tlv_tf_1.1.tlv"
+#define TF_NVM_TLV_1_0_1_PATH           "/lib/firmware/nvm_tlv_tf_1.1.bin"
+#else
 #define TF_RAMPATCH_TLV_1_0_0_PATH      "/lib/firmware/qca/rampatch_tlv_tf_1.0.tlv"
 #define TF_NVM_TLV_1_0_0_PATH           "/lib/firmware/qca/nvm_tlv_tf_1.0.bin"
 #define TF_RAMPATCH_TLV_1_0_1_PATH      "/lib/firmware/qca/rampatch_tlv_tf_1.1.tlv"
 #define TF_NVM_TLV_1_0_1_PATH           "/lib/firmware/qca/nvm_tlv_tf_1.1.bin"
+#endif
 
 /* This header value in rampatch file decides event handling mechanism in the HOST */
 #define ROME_SKIP_EVT_NONE     0x00
