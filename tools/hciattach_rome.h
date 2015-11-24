@@ -249,8 +249,8 @@ typedef struct
 #define ROME_NVM_TLV_2_0_1_PATH         "/lib/firmware/nvm_tlv_2.1.bin"
 #define ROME_RAMPATCH_TLV_3_0_0_PATH    "/lib/firmware/rampatch_tlv_3.0.tlv"
 #define ROME_NVM_TLV_3_0_0_PATH         "/lib/firmware/nvm_tlv_3.0.bin"
-#define ROME_RAMPATCH_TLV_3_0_2_PATH    "/lib/firmware/rampatch_tlv_3.2.tlv"
-#define ROME_NVM_TLV_3_0_2_PATH         "/lib/firmware/nvm_tlv_3.2.bin"
+#define ROME_RAMPATCH_TLV_3_0_2_PATH    "/lib/firmware/btfw32.tlv"
+#define ROME_NVM_TLV_3_0_2_PATH         "/lib/firmware/btnv32.bin"
 #ifdef _PLATFORM_MDM_
 #define TF_RAMPATCH_TLV_1_0_0_PATH      "/lib/firmware/rampatch_tlv_tf_1.0.tlv"
 #define TF_NVM_TLV_1_0_0_PATH           "/lib/firmware/nvm_tlv_tf_1.0.bin"
