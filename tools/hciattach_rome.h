@@ -208,6 +208,7 @@ typedef struct
 #define TAG_NUM_OFFSET             5
 #define TAG_NUM_2			2
 #define TAG_NUM_17			(17)
+#define TAG_NUM_27			27
 #define TAG_NUM_44			44
 #define TAG_BDADDR_OFFSET     7
 
@@ -223,6 +224,12 @@ typedef struct
 #define FWCONF_IBS_ENABLE		(1)
 #define FWCONF_IBS_VAL_BIT		(7)
 #define FWCONF_IBS_VAL_OFFSET		(0)
+
+/* FW DEEP SLEEP Configuration */
+#define FWCONF_DEEP_SLEEP_DISABLE	0
+#define FWCONF_DEEP_SLEEP_ENABLE	1
+#define FWCONF_DEEP_SLEEP_BYTE_OFFSET	0
+#define FWCONF_DEEP_SLEEP_BIT_OFFSET	0
 
 #define MAX_RETRY_CNT  1
 #define SELECT_TIMEOUT 3

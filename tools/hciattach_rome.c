@@ -923,6 +923,7 @@ int rome_get_tlv_file(char *file_path)
     unsigned char *nvm_byte_ptr;
     unsigned char bdaddr[6];
     unsigned short pcm_value, ibs_value;
+    unsigned short deep_sleep_value;
 
     fprintf(stderr, "File Open (%s)\n", file_path);
     pFile = fopen ( file_path , "r" );
@@ -1036,6 +1037,22 @@ int rome_get_tlv_file(char *file_path)
 			}
 		}
 	    }
+
+	    if (nvm_ptr->tag_id == TAG_NUM_27) {
+	        if ((deep_sleep_value =
+	            get_value_from_config(FW_CONFIG_FILE_PATH, "DEEP_SLEEP")) >= 0) {
+	            if (deep_sleep_value == FWCONF_DEEP_SLEEP_DISABLE) {
+	                nvm_byte_ptr[FWCONF_DEEP_SLEEP_BYTE_OFFSET] &=
+					(~(1 << FWCONF_DEEP_SLEEP_BIT_OFFSET));
+	            } else if (deep_sleep_value == FWCONF_DEEP_SLEEP_ENABLE) {
+	                nvm_byte_ptr[FWCONF_DEEP_SLEEP_BYTE_OFFSET] |=
+					(1 << FWCONF_DEEP_SLEEP_BIT_OFFSET);
+	            } else {
+	                fprintf(stderr, "Ignoring invalid deep sleep config value\n");
+	            }
+	        }
+	    }
+
             /* Read from file and check what PCM Configuration is required:
              * Master = 0 /Slave = 1 */
             /* Override PCM configuration */
