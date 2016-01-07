@@ -37,6 +37,25 @@ MISC_FLAGS
 AC_ARG_ENABLE(threads, AC_HELP_STRING([--enable-threads],
 		[enable threading support]), [enable_threads=${enableval}])
 
+AC_ARG_WITH([glib],
+	AC_HELP_STRING([--with-glib],
+		[enable glib, building HLOS systems which use glib]))
+
+if (test "x${with_glib}" = "xyes"); then
+	PKG_CHECK_MODULES(GTHREAD, gthread-2.0 >= 2.16, dummy=yes,
+				AC_MSG_ERROR(GThread >= 2.16 is required))
+	PKG_CHECK_MODULES(GLIB, glib-2.0 >= 2.28, dummy=yes,
+				AC_MSG_ERROR(GLib >= 2.28 is required))
+
+	GLIB_CFLAGS="$GLIB_CFLAGS $GTHREAD_CFLAGS"
+	GLIB_LIBS="$GLIB_LIBS $GTHREAD_LIBS"
+
+	AC_SUBST(GLIB_CFLAGS)
+	AC_SUBST(GLIB_LIBS)
+fi
+
+AM_CONDITIONAL(USE_GLIB, test "x${with_glib}" = "xyes")
+
 AC_CHECK_FUNC(signalfd, dummy=yes,
 			AC_MSG_ERROR(signalfd support is required))
 
@@ -48,11 +67,6 @@ AC_CHECK_LIB(pthread, pthread_create, dummy=yes,
 
 AC_CHECK_LIB(dl, dlopen, dummy=yes,
 			AC_MSG_ERROR(dynamic linking loader is required))
-
-PKG_CHECK_MODULES(GLIB, glib-2.0 >= 2.28, dummy=yes,
-				AC_MSG_ERROR(GLib >= 2.28 is required))
-AC_SUBST(GLIB_CFLAGS)
-AC_SUBST(GLIB_LIBS)
 
 if (test "${enable_threads}" = "yes"); then
 	AC_DEFINE(NEED_THREADS, 1, [Define if threading support is required])
