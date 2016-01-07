@@ -204,6 +204,8 @@ typedef struct
 #define MAX_RETRY_CNT  1
 #define SELECT_TIMEOUT 3
 
+#define PARAM_LEN      20
+
 /* NVM Tags specifically used for ROME 1.0 */
 #define ROME_1_0_100022_1       0x101000221
 #define ROME_1_0_100019           0x101000190
@@ -360,4 +362,10 @@ enum{
     ROME_VER_3_2 = ((ROME_PATCH_VER_0302 << 16 ) | ROME_SOC_ID_44 ),
     TUFELLO_VER_1_0 = ((ROME_PATCH_VER_0300 << 16 ) | ROME_SOC_ID_13 )
 };
+
+#ifdef USE_GLIB
+#include <glib.h>
+#define strlcpy g_strlcpy
+#endif
+
 #endif /* HW_ROME_H */
