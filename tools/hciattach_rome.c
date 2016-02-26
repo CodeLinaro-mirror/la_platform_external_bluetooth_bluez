@@ -1807,6 +1807,7 @@ int isSpeedValid(int speed, int *local_baud_rate, int *controller_baud_rate)
 int qca_soc_init(int fd, int speed, char *bdaddr)
 {
     int err = -1;
+    int ret = 0;
     int size, local_baud_rate = 0, controller_baud_rate = 0;
 
     vnd_userial.fd = fd;
@@ -1822,6 +1823,7 @@ int qca_soc_init(int fd, int speed, char *bdaddr)
     /* Get Rome version information */
     if((err = rome_patch_ver_req(fd)) <0){
         fprintf(stderr, "%s: Fail to get Rome Version (0x%x)\n", __FUNCTION__, err);
+        ret = -1;
         goto error;
     }
 
@@ -1835,6 +1837,7 @@ int qca_soc_init(int fd, int speed, char *bdaddr)
                 err = rome_download_rampatch(fd);
                 if (err < 0) {
                     fprintf(stderr, "%s: DOWNLOAD RAMPATCH failed!\n", __FUNCTION__);
+                    ret = -1;
                     goto error;
                 }
                 fprintf(stderr, "%s: DOWNLOAD RAMPTACH complete\n", __FUNCTION__);
@@ -1844,6 +1847,7 @@ int qca_soc_init(int fd, int speed, char *bdaddr)
                 err = rome_attach_rampatch(fd);
                 if (err < 0) {
                     fprintf(stderr, "%s: ATTACH RAMPATCH failed!\n", __FUNCTION__);
+                    ret = -1;
                     goto error;
                 }
                 fprintf(stderr, "%s: ATTACH RAMPTACH complete\n", __FUNCTION__);
@@ -1853,6 +1857,7 @@ int qca_soc_init(int fd, int speed, char *bdaddr)
                 err = rome_rampatch_reset(fd);
                 if ( err < 0 ) {
                     fprintf(stderr, "Failed to RESET after RAMPATCH upgrade!\n");
+                    ret = -1;
                     goto error;
                 }
 
@@ -1861,6 +1866,7 @@ int qca_soc_init(int fd, int speed, char *bdaddr)
                 err = rome_1_0_nvm_tag_dnld(fd);
                 if ( err <0 ) {
                     fprintf(stderr, "Downloading NVM Failed !!\n");
+                    ret = -1;
                     goto error;
                 }
 
@@ -1868,6 +1874,7 @@ int qca_soc_init(int fd, int speed, char *bdaddr)
                 err = rome_hci_reset_req(fd, local_baud_rate);
                 if ( err <0 ) {
                     fprintf(stderr, "HCI Reset Failed !!\n");
+                    ret = -1;
                     goto error;
                 }
 
@@ -1911,12 +1918,14 @@ download:
             else {
                 /* Change only if baud rate requested is valid or not */
                 isSpeedValid(speed, &local_baud_rate, &controller_baud_rate);
-                if (local_baud_rate < 0 || controller_baud_rate < 0)
+                if (local_baud_rate < 0 || controller_baud_rate < 0) {
+                    ret = -1;
                     goto error;
-
+                }
                 err = rome_set_baudrate_req(fd, local_baud_rate, controller_baud_rate);
                 if (err < 0) {
                     fprintf(stderr, "%s: Baud rate change failed!\n", __FUNCTION__);
+                    ret = -1;
                     goto error;
                 }
              }
@@ -1925,6 +1934,7 @@ download:
             err = rome_download_tlv_file(fd);
             if (err < 0) {
                 fprintf(stderr, "%s: Download TLV file failed!\n", __FUNCTION__);
+                ret = -1;
                 goto error;
             }
             fprintf(stderr, "%s: Download TLV file successfully \n", __FUNCTION__);
@@ -1936,6 +1946,7 @@ download:
             err = rome_set_baudrate_req(fd, local_baud_rate, controller_baud_rate);
             if (err < 0) {
                 fprintf(stderr, "%s: Baud rate change failed!\n", __FUNCTION__);
+                ret = -1;
                 goto error;
             }
 
@@ -1943,6 +1954,7 @@ download:
             err = rome_hci_reset_req(fd, local_baud_rate);
             if ( err <0 ) {
                 fprintf(stderr, "HCI Reset Failed !!!\n");
+                ret = -1;
                 goto error;
             }
             fprintf(stderr, "HCI Reset is done\n");
@@ -1951,7 +1963,7 @@ download:
         case ROME_VER_UNKNOWN:
         default:
             fprintf(stderr, "%s: Detected unknown ROME version\n", __FUNCTION__);
-            err = -1;
+            ret = -1;
             break;
     }
 
@@ -1959,9 +1971,11 @@ error:
 #ifdef _PLATFORM_MDM_
     /* Vote UART CLK OFF post to FW download */
     err = ioctl(fd, USERIAL_OP_CLK_OFF);
-    if (err < 0)
+    if (err < 0) {
         fprintf(stderr, "%s: Failed to vote UART CLK OFF!!!\n", __func__);
+        return -1;
+    }
 #endif
 
-    return err;
+    return ret;
 }
