@@ -1332,6 +1332,7 @@ int main(int argc, char *argv[])
 	struct pollfd p;
 	sigset_t sigs;
 	char dev[PATH_MAX];
+	size_t len;
 
 	detach = 1;
 	printpid = 0;
@@ -1398,13 +1399,11 @@ int main(int argc, char *argv[])
 			if (!strchr(opt, '/'))
 				strcpy(dev, "/dev/");
 
-			if (strlen(opt) + 1 > sizeof(dev) - strlen(dev)) {
+			len = strlcat(dev, opt, sizeof(dev));
+			if (len >= sizeof(dev)) {
 				fprintf(stderr, "error: source string size exceeded\n");
 				exit(1);
 			}
-
-			strncat(dev, opt, sizeof(dev) - strlen(dev) - 1);
-
 			break;
 
 		case 1:
