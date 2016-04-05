@@ -27,6 +27,11 @@
 #define N_HCI	15
 #endif
 
+#ifdef USE_GLIB
+#include <glib.h>
+#define strlcat g_strlcat
+#endif
+
 #define HCIUARTSETPROTO		_IOW('U', 200, int)
 #define HCIUARTGETPROTO		_IOR('U', 201, int)
 #define HCIUARTGETDEVICE	_IOR('U', 202, int)
