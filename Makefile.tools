@@ -189,11 +189,20 @@ tools_hciattach_SOURCES = tools/hciattach.c tools/hciattach.h \
 						tools/hciattach_rome.c tools/hciattach_rome.h
 tools_hciattach_LDADD = lib/libbluetooth-internal.la
 
+if USE_GLIB
+ tools_hciattach_CFLAGS  = $(AM_CFLAGS) -DUSE_GLIB @GLIB_CFLAGS@
+ tools_hciattach_LDFLAGS = -lpthread @GLIB_LIBS@
+else
+ tools_hciattach_CFLAGS = $(AM_CFLAGS)
+ tools_hciattach_LDFLAGS = -lpthread
+endif
+
 tools_hciconfig_SOURCES = tools/hciconfig.c tools/csr.h tools/csr.c
 tools_hciconfig_LDADD = lib/libbluetooth-internal.la
 
 tools_hcitool_SOURCES = tools/hcitool.c src/oui.h src/oui.c
 tools_hcitool_LDADD = lib/libbluetooth-internal.la @UDEV_LIBS@
+
 
 tools_hcidump_SOURCES = tools/hcidump.c \
 				tools/parser/parser.h tools/parser/parser.c \

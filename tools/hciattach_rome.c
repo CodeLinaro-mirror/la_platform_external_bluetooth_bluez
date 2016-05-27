@@ -878,7 +878,7 @@ int get_value_from_config(char *file_path,char *param)
     FILE *pfile = NULL;
     char *line = NULL;
     char *pch = NULL;
-    char param_str[20];
+    char param_str[PARAM_LEN];
     int bytes_read = 0, position;
     int ret = -1;
 
@@ -898,7 +898,9 @@ int get_value_from_config(char *file_path,char *param)
             pch = memchr(line, '=', strlen(line));
             if (pch != NULL) {
                 position = pch - line;
-                strncpy(param_str, line, position);
+                strlcpy(param_str, line, sizeof(param_str));
+                if (position >= sizeof(param_str))
+                    position = sizeof(param_str) - 1;
                 if (strncmp(param_str, param, position) == 0) {
                     ret = atoi(pch + 1);
                     break;
@@ -906,6 +908,7 @@ int get_value_from_config(char *file_path,char *param)
             }
         }
     }
+    /* getline() will allocate a buffer for storing the line. */
     free(line);
     fclose(pfile);
     return ret;
